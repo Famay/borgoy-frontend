@@ -2,11 +2,12 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../app/AuthContext";
 
 const titles: Record<string, string> = {
-  "/": "VerMeat — прототип системы верификации",
+  "/": "VerMeat - прототип системы верификации",
   "/supplier": "Кабинет поставщика",
   "/registry": "Реестр сертификатов",
   "/verify": "Проверка подлинности",
   "/profile": "Профиль пользователя",
+  "/admin/logs": "Журнал аудита",
   "/login": "Вход в систему",
   "/register": "Регистрация поставщика",
 };

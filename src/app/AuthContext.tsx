@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useMemo, useState } from "react";
-import { mockUsers } from "../data/users";
+import { loginRequest, registerRequest, type RegisterPayload } from "../services/api";
 import type { AuthUser } from "../types/auth";
 
 interface LoginPayload {
@@ -8,29 +8,38 @@ interface LoginPayload {
   password: string;
 }
 
+interface AuthResult {
+  success: boolean;
+  user?: AuthUser;
+  message?: string;
+}
+
+interface AuthSession {
+  user: AuthUser;
+  token: string;
+}
+
 interface AuthContextValue {
   user: AuthUser | null;
+  token: string | null;
   isAuthenticated: boolean;
-  login: (payload: LoginPayload) => {
-    success: boolean;
-    user?: AuthUser;
-    message?: string;
-  };
+  login: (payload: LoginPayload) => Promise<AuthResult>;
+  register: (payload: RegisterPayload) => Promise<AuthResult>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-const AUTH_STORAGE_KEY = "vermeat.auth.user";
+const AUTH_STORAGE_KEY = "vermeat.auth.session";
 
-function readStoredUser() {
-  const storedUser = localStorage.getItem(AUTH_STORAGE_KEY);
+function readStoredSession() {
+  const storedSession = localStorage.getItem(AUTH_STORAGE_KEY);
 
-  if (!storedUser) {
+  if (!storedSession) {
     return null;
   }
 
   try {
-    return JSON.parse(storedUser) as AuthUser;
+    return JSON.parse(storedSession) as AuthSession;
   } catch {
     localStorage.removeItem(AUTH_STORAGE_KEY);
     return null;
@@ -38,44 +47,56 @@ function readStoredUser() {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(() => readStoredUser());
+  const [session, setSession] = useState<AuthSession | null>(() =>
+    readStoredSession()
+  );
+
+  const persistSession = (nextSession: AuthSession) => {
+    setSession(nextSession);
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextSession));
+  };
 
   const value = useMemo(
     () => ({
-      user,
-      isAuthenticated: user !== null,
-      login: ({ email, password }: LoginPayload) => {
-        const normalizedEmail = email.trim().toLowerCase();
-        const found = mockUsers.find(
-          (item) =>
-            item.email.toLowerCase() === normalizedEmail && item.password === password
-        );
+      user: session?.user ?? null,
+      token: session?.token ?? null,
+      isAuthenticated: session !== null,
+      login: async ({ email, password }: LoginPayload) => {
+        try {
+          const nextSession = await loginRequest(email, password);
+          persistSession(nextSession);
 
-        if (!found) {
+          return { success: true, user: nextSession.user };
+        } catch (error) {
           return {
             success: false,
-            message: "Неверный email или пароль",
+            message:
+              error instanceof Error ? error.message : "Ошибка входа в систему",
           };
         }
+      },
+      register: async (payload: RegisterPayload) => {
+        try {
+          const nextSession = await registerRequest(payload);
+          persistSession(nextSession);
 
-        const authUser: AuthUser = {
-          id: found.id,
-          name: found.name,
-          email: found.email,
-          role: found.role,
-        };
-
-        setUser(authUser);
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authUser));
-
-        return { success: true, user: authUser };
+          return { success: true, user: nextSession.user };
+        } catch (error) {
+          return {
+            success: false,
+            message:
+              error instanceof Error
+                ? error.message
+                : "Ошибка регистрации поставщика",
+          };
+        }
       },
       logout: () => {
-        setUser(null);
+        setSession(null);
         localStorage.removeItem(AUTH_STORAGE_KEY);
       },
     }),
-    [user]
+    [session]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

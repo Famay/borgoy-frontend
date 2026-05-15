@@ -6,14 +6,14 @@ export interface MockUserRecord extends AuthUser {
 
 export const mockUsers: MockUserRecord[] = [
   {
-    id: 1,
+    id: "1",
     name: "Андрей Иванов",
     email: "supplier@vermeat.ru",
     password: "supplier123",
     role: "supplier",
   },
   {
-    id: 2,
+    id: "2",
     name: "Администратор VerMeat",
     email: "admin@vermeat.ru",
     password: "admin123",

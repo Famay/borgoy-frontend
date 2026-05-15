@@ -15,16 +15,19 @@ export default function LoginPage() {
   const { login } = useAuth();
 
   const [form, setForm] = useState({
-    email: "",
-    password: "",
+    email: "supplier@vermeat.ru",
+    password: "supplier123",
   });
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setIsSubmitting(true);
 
-    const result = login(form);
+    const result = await login(form);
+    setIsSubmitting(false);
 
     if (!result.success) {
       setError(result.message || "Ошибка входа");
@@ -32,7 +35,8 @@ export default function LoginPage() {
     }
 
     const state = location.state as LocationState | null;
-    const nextPath = state?.from?.pathname ?? getDefaultRouteForRole(result.user?.role ?? "guest");
+    const nextPath =
+      state?.from?.pathname ?? getDefaultRouteForRole(result.user?.role ?? "guest");
 
     navigate(nextPath, { replace: true });
   };
@@ -44,7 +48,7 @@ export default function LoginPage() {
           <div className="auth-card__badge">VerMeat</div>
           <h1 className="auth-card__title">Вход в систему</h1>
           <p className="auth-card__text">
-            Войдите в систему для работы с сертификатами и реестром продукции
+            Войдите через backend API, чтобы работать с партиями и сертификатами в PostgreSQL.
           </p>
         </div>
 
@@ -73,13 +77,17 @@ export default function LoginPage() {
 
           {error && <div className="form-error">{error}</div>}
 
-          <button type="submit" className="button button--primary auth-form__submit">
-            Войти
+          <button
+            type="submit"
+            className="button button--primary auth-form__submit"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Вход..." : "Войти"}
           </button>
         </form>
 
         <div className="demo-users">
-          <div className="demo-users__title">Тестовые учетные записи</div>
+          <div className="demo-users__title">Тестовые учетные записи из seed</div>
           <div className="demo-users__item">
             <strong>Поставщик:</strong> supplier@vermeat.ru / supplier123
           </div>

@@ -12,27 +12,38 @@ export default function HomePage() {
     <section className="page">
       <div className="hero">
         <div className="hero__content">
-          <div className="hero__badge">Прототип дипломного проекта</div>
+          <div className="hero__badge">MVP дипломного проекта</div>
           <h1 className="hero__title">
-            VerMeat - система цифровой верификации мясной продукции
+            VerMeat — цифровая проверка происхождения боргойской баранины
           </h1>
           <p className="hero__text">
-            VerMeat - веб-платформа для хранения сертификатов, фиксации их хеша в
-            блокчейне и проверки подлинности продукции по номеру партии или документа.
+            Поставщик загружает сертификат партии, система формирует SHA-256,
+            сохраняет контрольные данные и открывает публичную проверку для
+            покупателя по номеру партии или QR-токену.
           </p>
 
           <div className="hero__actions">
-            <button className="button button--primary" onClick={() => navigate("/supplier")}>
-              Начать работу
+            <button
+              className="button button--primary"
+              onClick={() => navigate("/supplier")}
+            >
+              Добавить сертификат
             </button>
-            <button className="button button--secondary" onClick={() => navigate("/verify")}>
-              Проверить сертификат
+            <button
+              className="button button--secondary"
+              onClick={() => navigate("/verify")}
+            >
+              Проверить продукцию
             </button>
           </div>
         </div>
 
         <div className="hero__panel hero__image-panel">
-          <img src={heroImage} alt="Мясная продукция" className="hero__image" />
+          <img
+            src={heroImage}
+            alt="Боргойская баранина"
+            className="hero__image"
+          />
         </div>
       </div>
 
@@ -56,13 +67,13 @@ export default function HomePage() {
       </div>
 
       <div className="card">
-        <h2 className="section-title">Что уже показывает прототип</h2>
+        <h2 className="section-title">Что закрывает текущий прототип</h2>
         <ul className="feature-list">
-          <li>Личный кабинет поставщика</li>
-          <li>Загрузку сертификатов и привязку к партии</li>
-          <li>Реестр сертификатов</li>
-          <li>Проверку подлинности по номеру сертификата</li>
-          <li>Отображение хеша и идентификатора записи</li>
+          <li>роли поставщика, администратора и публичного покупателя</li>
+          <li>карточку партии с происхождением, массой и датой производства</li>
+          <li>загрузку сертификата и расчет SHA-256 в браузере</li>
+          <li>локальный реестр сертификатов с CID и transaction hash-заглушками</li>
+          <li>публичную проверку по номеру сертификата, партии или QR-токену</li>
         </ul>
       </div>
     </section>

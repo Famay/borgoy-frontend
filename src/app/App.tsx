@@ -10,6 +10,7 @@ import VerifyPage from "../pages/VerifyPage";
 import ProfilePage from "../pages/ProfilePage";
 import LoginPage from "../pages/LoginPage";
 import RegisterPage from "../pages/RegisterPage";
+import AdminLogsPage from "../pages/AdminLogsPage";
 
 export default function App() {
   return (
@@ -46,6 +47,15 @@ export default function App() {
                 element={
                   <ProtectedRoute allowedRoles={["supplier", "admin"]}>
                     <ProfilePage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/admin/logs"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminLogsPage />
                   </ProtectedRoute>
                 }
               />

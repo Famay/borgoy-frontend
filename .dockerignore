@@ -1,0 +1,14 @@
+node_modules
+dist
+artifacts
+cache
+types/ethers-contracts
+server/generated
+src/generated
+.git
+.env
+*.log
+api.err.log
+api.out.log
+frontend.err.log
+frontend.out.log

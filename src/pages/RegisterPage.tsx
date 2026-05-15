@@ -1,6 +1,11 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../app/AuthContext";
+import { getDefaultRouteForRole } from "../utils/auth";
 
 export default function RegisterPage() {
+  const navigate = useNavigate();
+  const { register } = useAuth();
   const [form, setForm] = useState({
     companyName: "",
     contactName: "",
@@ -10,10 +15,39 @@ export default function RegisterPage() {
     password: "",
     confirmPassword: "",
   });
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Регистрация поставщика", form);
+    setError("");
+
+    if (form.password !== form.confirmPassword) {
+      setError("Пароли не совпадают");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    const result = await register({
+      name: form.contactName,
+      companyName: form.companyName,
+      email: form.email,
+      phone: form.phone || undefined,
+      inn: form.inn || undefined,
+      password: form.password,
+    });
+
+    setIsSubmitting(false);
+
+    if (!result.success) {
+      setError(result.message || "Ошибка регистрации");
+      return;
+    }
+
+    navigate(getDefaultRouteForRole(result.user?.role ?? "supplier"), {
+      replace: true,
+    });
   };
 
   return (
@@ -23,8 +57,7 @@ export default function RegisterPage() {
           <div className="auth-card__badge">VerMeat</div>
           <h1 className="auth-card__title">Регистрация поставщика</h1>
           <p className="auth-card__text">
-            Создайте учетную запись для загрузки сертификатов и работы с партиями
-            продукции
+            Учетная запись создается через Express API и сохраняется в PostgreSQL.
           </p>
         </div>
 
@@ -104,14 +137,22 @@ export default function RegisterPage() {
                 id="confirmPassword"
                 type="password"
                 value={form.confirmPassword}
-                onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, confirmPassword: e.target.value })
+                }
                 placeholder="Повторите пароль"
               />
             </div>
           </div>
 
-          <button type="submit" className="button button--primary auth-form__submit">
-            Зарегистрироваться
+          {error && <div className="form-error">{error}</div>}
+
+          <button
+            type="submit"
+            className="button button--primary auth-form__submit"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Регистрация..." : "Зарегистрироваться"}
           </button>
         </form>
       </div>

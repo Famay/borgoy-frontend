@@ -1,0 +1,155 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../server/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  SUPPLIER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  PENDING
+  BLOCKED
+}
+
+enum CertificateStatus {
+  PENDING
+  CONFIRMED
+  MISMATCH
+  BLOCKCHAIN_FAILED
+}
+
+enum AuditAction {
+  USER_REGISTERED
+  USER_LOGIN
+  BATCH_CREATED
+  CERTIFICATE_UPLOADED
+  CERTIFICATE_STATUS_UPDATED
+  CERTIFICATE_DELETED
+  CERTIFICATE_VERIFIED
+  VERIFICATION_FAILED
+}
+
+model User {
+  id           String     @id @default(uuid())
+  name         String
+  companyName  String?
+  email        String     @unique
+  phone        String?
+  inn          String?
+  passwordHash String
+  role         UserRole   @default(SUPPLIER)
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  batches   Batch[]
+  auditLogs AuditLog[]
+
+  @@index([role])
+  @@index([status])
+}
+
+model Batch {
+  id             String   @id @default(uuid())
+  batchNumber    String   @unique
+  productName    String
+  originRegion   String
+  productionDate DateTime
+  weightKg       Decimal  @db.Decimal(10, 2)
+  description    String?
+  publicToken    String   @unique
+  supplierId     String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  supplier     User                 @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  certificates Certificate[]
+  checks       VerificationResult[]
+
+  @@index([supplierId])
+  @@index([batchNumber])
+  @@index([publicToken])
+}
+
+model Certificate {
+  id             String            @id @default(uuid())
+  certificateNo  String            @unique
+  documentNumber String
+  authority      String
+  description    String?
+  issueDate      DateTime          @default(now())
+  status         CertificateStatus @default(PENDING)
+  fileName       String
+  fileMimeType   String
+  fileSize       Int
+  fileHash       String
+  ipfsCid        String?
+  qrPayload      String?
+  qrCodeDataUrl  String?
+  batchId        String
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  batch                 Batch                  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  blockchainTransaction BlockchainTransaction?
+  checks                VerificationResult[]
+
+  @@index([batchId])
+  @@index([fileHash])
+  @@index([status])
+}
+
+model BlockchainTransaction {
+  id            String   @id @default(uuid())
+  network       String   @default("polygon-amoy")
+  contract      String?
+  txHash        String   @unique
+  blockNumber   Int?
+  certificateId String   @unique
+  createdAt     DateTime @default(now())
+
+  certificate Certificate @relation(fields: [certificateId], references: [id], onDelete: Cascade)
+}
+
+model VerificationResult {
+  id             String   @id @default(uuid())
+  query          String
+  isValid        Boolean
+  message        String
+  localHash      String?
+  blockchainHash String?
+  batchId        String?
+  certificateId  String?
+  createdAt      DateTime @default(now())
+
+  batch       Batch?       @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  certificate Certificate? @relation(fields: [certificateId], references: [id], onDelete: SetNull)
+
+  @@index([batchId])
+  @@index([certificateId])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id        String      @id @default(uuid())
+  action    AuditAction
+  entity    String
+  entityId  String?
+  message   String
+  userId    String?
+  metadata  Json?
+  createdAt DateTime    @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([action])
+  @@index([userId])
+  @@index([createdAt])
+}

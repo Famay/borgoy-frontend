@@ -15,7 +15,9 @@ export default function Sidebar() {
         <div className="sidebar__logo">VM</div>
         <div>
           <div className="sidebar__title">VerMeat</div>
-          <div className="sidebar__subtitle">Система верификации продукции</div>
+          <div className="sidebar__subtitle">
+            Система верификации продукции
+          </div>
         </div>
       </div>
 
