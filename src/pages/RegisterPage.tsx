@@ -27,13 +27,18 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!form.phone.trim()) {
+      setError("Укажите телефон для SMS-кодов входа");
+      return;
+    }
+
     setIsSubmitting(true);
 
     const result = await register({
       name: form.contactName,
       companyName: form.companyName,
       email: form.email,
-      phone: form.phone || undefined,
+      phone: form.phone,
       inn: form.inn || undefined,
       password: form.password,
     });
@@ -57,7 +62,7 @@ export default function RegisterPage() {
           <div className="auth-card__badge">VerMeat</div>
           <h1 className="auth-card__title">Регистрация поставщика</h1>
           <p className="auth-card__text">
-            Учетная запись создается через Express API и сохраняется в PostgreSQL.
+            Создайте учетную запись организации, чтобы добавлять партии продукции и сертификаты.
           </p>
         </div>
 
@@ -92,12 +97,12 @@ export default function RegisterPage() {
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
-                placeholder="supplier@vermeat.ru"
+                placeholder="contact@company.ru"
               />
             </div>
 
             <div className="form-group">
-              <label htmlFor="phone">Телефон</label>
+              <label htmlFor="phone">Телефон для SMS-кодов</label>
               <input
                 id="phone"
                 type="text"

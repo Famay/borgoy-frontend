@@ -972,25 +972,6 @@ textarea {
   margin-bottom: 8px;
 }
 
-.demo-users {
-  margin-top: 20px;
-  padding: 16px;
-  border-radius: 16px;
-  background: #f8fafc;
-  border: 1px solid var(--border);
-}
-
-.demo-users__title {
-  font-weight: 700;
-  margin-bottom: 10px;
-}
-
-.demo-users__item {
-  font-size: 14px;
-  color: #374151;
-  line-height: 1.7;
-}
-
 .topbar__user {
   display: flex;
   align-items: center;

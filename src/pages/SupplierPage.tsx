@@ -161,7 +161,7 @@ export default function SupplierPage() {
           <div>
             <h2 className="section-title">Загрузка нового сертификата</h2>
             <p className="section-subtitle">
-              Форма создает партию в PostgreSQL, отправляет файл на backend и получает серверный SHA-256, CID, транзакцию и QR-код.
+              Заполните данные партии, приложите сертификат и получите публичную ссылку для проверки продукции.
             </p>
           </div>
         </div>
@@ -272,7 +272,7 @@ export default function SupplierPage() {
         <div className="upload-box upload-box--interactive">
           <div className="upload-box__title">Файл сертификата</div>
           <div className="upload-box__text">
-            Файл отправляется на backend через Multer. Сервер рассчитывает SHA-256 и сохраняет контрольные данные в PostgreSQL.
+            Поддерживаются PDF и изображения. Система рассчитает контрольный хеш и сохранит данные для последующей проверки.
           </div>
           <input
             className="file-input"
@@ -307,7 +307,7 @@ export default function SupplierPage() {
               )}
               <div>
                 <div>
-                  <strong>{lastCertificate.id}</strong> сохранен в PostgreSQL.
+                  <strong>{lastCertificate.id}</strong> добавлен в реестр.
                 </div>
                 <a href={lastCertificate.publicUrl}>
                   Публичная проверка: {lastCertificate.publicUrl}
@@ -337,23 +337,23 @@ export default function SupplierPage() {
 
       <div className="side-column">
         <div className="card">
-          <h2 className="section-title">Пайплайн backend</h2>
+          <h2 className="section-title">Как проходит регистрация</h2>
           <ol className="logic-list process-list">
             <li>
               <span>1</span>
-              Frontend создает карточку партии через `POST /api/batches`
+              Поставщик заполняет сведения о партии и документе
             </li>
             <li>
               <span>2</span>
-              Файл сертификата уходит через `multipart/form-data`
+              Сертификат загружается в систему и получает контрольный хеш
             </li>
             <li>
               <span>3</span>
-              Backend рассчитывает SHA-256 и сохраняет запись в PostgreSQL
+              Контрольные данные сохраняются в реестре сертификатов
             </li>
             <li>
               <span>4</span>
-              Пока формируются демо-CID и демо-transaction hash
+              Для записи формируется QR-код публичной проверки
             </li>
             <li>
               <span>5</span>
@@ -363,12 +363,12 @@ export default function SupplierPage() {
         </div>
 
         <div className="card">
-          <h2 className="section-title">Следующий слой</h2>
+          <h2 className="section-title">Требования к данным</h2>
           <ul className="feature-list">
-            <li>заменить демо-CID на реальную загрузку в Pinata/IPFS</li>
-            <li>заменить демо-транзакцию на вызов смарт-контракта Polygon Amoy</li>
-            <li>добавить экран списка партий из PostgreSQL</li>
-            <li>добавить обработку дубликатов номера партии в интерфейсе</li>
+            <li>номер партии должен быть уникальным для каждой поставки</li>
+            <li>сертификат должен соответствовать выбранной партии продукции</li>
+            <li>дата производства и регион происхождения заполняются по документам</li>
+            <li>повторная загрузка одного и того же файла блокируется системой</li>
           </ul>
         </div>
 

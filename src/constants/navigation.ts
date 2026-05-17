@@ -15,6 +15,11 @@ export const navigationItems: NavigationItem[] = [
     roles: ["supplier", "admin"],
   },
   {
+    label: "Мои сертификаты",
+    path: "/my-certificates",
+    roles: ["supplier"],
+  },
+  {
     label: "Реестр сертификатов",
     path: "/registry",
     roles: ["admin"],

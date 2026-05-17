@@ -42,7 +42,7 @@ export default function VerifyPage() {
   const { certificates } = useCertificates();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
-  const initialQuery = useMemo(() => token ?? "CERT-2026-001", [token]);
+  const initialQuery = useMemo(() => token ?? "", [token]);
   const [query, setQuery] = useState(initialQuery);
   const [found, setFound] = useState<Certificate | null>(null);
   const [resultMessage, setResultMessage] = useState("");
@@ -112,7 +112,7 @@ export default function VerifyPage() {
         setFound(fallback);
         setResultMessage(
           fallback
-            ? "API не нашел запись, показан локальный fallback из текущей сессии."
+            ? "Показана запись, доступная в текущей сессии."
             : result.message
         );
       } catch (error) {
@@ -120,7 +120,7 @@ export default function VerifyPage() {
         setFound(fallback);
         setResultMessage(
           fallback
-            ? "API временно недоступен, показан локальный fallback."
+            ? "Сервис проверки временно недоступен. Показана запись, доступная в текущей сессии."
             : error instanceof Error
               ? error.message
               : "Не удалось выполнить проверку"
@@ -133,6 +133,10 @@ export default function VerifyPage() {
   );
 
   useEffect(() => {
+    if (!initialQuery) {
+      return;
+    }
+
     const timeoutId = window.setTimeout(() => {
       void runVerification(initialQuery);
     }, 0);
@@ -266,7 +270,7 @@ export default function VerifyPage() {
             id="verifyQuery"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="CERT-2026-001 или BORG-2026-0241"
+            placeholder="Номер сертификата, партии или QR-токен"
           />
         </div>
 
@@ -309,8 +313,8 @@ export default function VerifyPage() {
         <div className="upload-box">
           <div className="upload-box__title">Что проверяется</div>
           <div className="upload-box__text">
-            Покупатель получает публичные сведения из PostgreSQL и результат
-            сверки хеша сертификата с контрольной записью.
+            Покупатель видит сведения о партии, поставщике и результате сверки
+            сертификата с контрольной записью.
           </div>
         </div>
       </div>
@@ -400,7 +404,7 @@ export default function VerifyPage() {
             {isChecking
               ? "Проверка выполняется..."
               : resultDescription ||
-                "Попробуйте CERT-2026-001, BORG-2026-0241 или QR-токен."}
+                "Введите номер сертификата, партии или отсканируйте QR-код."}
           </div>
         )}
       </div>

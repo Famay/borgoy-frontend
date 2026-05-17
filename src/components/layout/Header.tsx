@@ -2,7 +2,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../app/AuthContext";
 
 const titles: Record<string, string> = {
-  "/": "VerMeat - прототип системы верификации",
+  "/": "VerMeat - система верификации продукции",
   "/supplier": "Кабинет поставщика",
   "/registry": "Реестр сертификатов",
   "/verify": "Проверка подлинности",
@@ -25,7 +25,7 @@ export default function Header() {
   return (
     <header className="topbar">
       <div>
-        <div className="topbar__label">Дипломный проект</div>
+        <div className="topbar__label">Цифровая прослеживаемость</div>
         <h1 className="topbar__title">
           {titles[location.pathname] ?? "VerMeat"}
         </h1>

@@ -142,7 +142,7 @@ export default function RegistryPage() {
           <h1 className="section-title">Реестр сертификатов</h1>
           <p className="section-subtitle">
             Администратор может менять статус сертификата и удалять ошибочные
-            записи из PostgreSQL.
+            записи из реестра.
           </p>
         </div>
         <button
@@ -158,7 +158,7 @@ export default function RegistryPage() {
       {message && <div className="success-panel">{message}</div>}
       {error && (
         <div className="form-error">
-          {error}. Если API недоступен, показан локальный fallback из текущей
+          {error}. Если сервис временно недоступен, показаны записи из текущей
           сессии.
         </div>
       )}

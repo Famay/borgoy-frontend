@@ -25,6 +25,7 @@ export default function ProfilePage() {
   const [recentLogs, setRecentLogs] = useState<AuditLogEntry[]>([]);
   const [error, setError] = useState("");
   const isAdmin = user?.role === "admin";
+  const isTwoFactorEnabled = Boolean(user?.twoFactorEnabled);
 
   useEffect(() => {
     if (!token || !isAdmin) {
@@ -112,6 +113,13 @@ export default function ProfilePage() {
             <div className="detail-card__label">Статус аккаунта</div>
             <div className="detail-card__value">{user.status ?? "ACTIVE"}</div>
           </div>
+
+          <div className="detail-card">
+            <div className="detail-card__label">Двухфакторный вход</div>
+            <div className="detail-card__value">
+              {isTwoFactorEnabled ? "Включен по SMS" : "Отключен"}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -149,7 +157,7 @@ export default function ProfilePage() {
               <div>
                 <h2 className="section-title">Последние события</h2>
                 <p className="section-subtitle">
-                  Реальные записи из таблицы AuditLog.
+                  Последние действия пользователей и системные события.
                 </p>
               </div>
               <button
@@ -184,13 +192,29 @@ export default function ProfilePage() {
         </>
       ) : (
         <div className="card">
-          <h2 className="section-title">Рабочие действия</h2>
-          <ul className="feature-list">
-            <li>создать партию продукции и загрузить сертификат</li>
-            <li>сформировать серверный SHA-256 файла</li>
-            <li>получить QR-код публичной проверки</li>
-            <li>проверить статус сертификата в реестре после обработки</li>
-          </ul>
+          <div className="section-header">
+            <div>
+              <h2 className="section-title">Рабочие действия</h2>
+              <p className="section-subtitle">
+                Быстрый переход к основным разделам поставщика.
+              </p>
+            </div>
+          </div>
+
+          <div className="actions-row">
+            <button
+              className="button button--primary"
+              onClick={() => navigate("/supplier")}
+            >
+              Добавить сертификат
+            </button>
+            <button
+              className="button button--secondary"
+              onClick={() => navigate("/my-certificates")}
+            >
+              Мои сертификаты
+            </button>
+          </div>
         </div>
       )}
     </section>

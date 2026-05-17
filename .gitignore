@@ -30,6 +30,7 @@ dist-ssr
 /src/generated/prisma
 /server/generated/prisma
 /server/uploads
+/server/sms-outbox
 
 # Hardhat generated output
 /artifacts

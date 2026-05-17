@@ -12,7 +12,7 @@ export default function HomePage() {
     <section className="page">
       <div className="hero">
         <div className="hero__content">
-          <div className="hero__badge">MVP дипломного проекта</div>
+          <div className="hero__badge">Верификация происхождения продукции</div>
           <h1 className="hero__title">
             VerMeat — цифровая проверка происхождения боргойской баранины
           </h1>
@@ -67,13 +67,13 @@ export default function HomePage() {
       </div>
 
       <div className="card">
-        <h2 className="section-title">Что закрывает текущий прототип</h2>
+        <h2 className="section-title">Возможности системы</h2>
         <ul className="feature-list">
-          <li>роли поставщика, администратора и публичного покупателя</li>
-          <li>карточку партии с происхождением, массой и датой производства</li>
-          <li>загрузку сертификата и расчет SHA-256 в браузере</li>
-          <li>локальный реестр сертификатов с CID и transaction hash-заглушками</li>
-          <li>публичную проверку по номеру сертификата, партии или QR-токену</li>
+          <li>единый реестр партий и сертификатов происхождения</li>
+          <li>контроль подлинности документа по SHA-256 и публичному QR-коду</li>
+          <li>раздельные кабинеты поставщика и администратора</li>
+          <li>хранение контрольных данных в IPFS и фиксация хеша в Polygon Amoy</li>
+          <li>быстрая проверка продукции по номеру сертификата, партии или QR-токену</li>
         </ul>
       </div>
     </section>

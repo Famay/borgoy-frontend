@@ -23,7 +23,10 @@ async function main() {
 
   const supplier = await prisma.user.upsert({
     where: { email: "supplier@vermeat.ru" },
-    update: {},
+    update: {
+      phone: "+7 (999) 123-45-67",
+      twoFactorEnabled: true,
+    },
     create: {
       name: "Андрей Иванов",
       companyName: "ООО «Боргойский продукт»",
@@ -32,17 +35,23 @@ async function main() {
       inn: "0300000000",
       passwordHash,
       role: UserRole.SUPPLIER,
+      twoFactorEnabled: true,
     },
   });
 
   await prisma.user.upsert({
     where: { email: "admin@vermeat.ru" },
-    update: {},
+    update: {
+      phone: "+7 (999) 765-43-21",
+      twoFactorEnabled: true,
+    },
     create: {
       name: "Администратор VerMeat",
       email: "admin@vermeat.ru",
+      phone: "+7 (999) 765-43-21",
       passwordHash: adminPasswordHash,
       role: UserRole.ADMIN,
+      twoFactorEnabled: true,
     },
   });
 

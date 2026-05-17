@@ -5,6 +5,7 @@ cache
 types/ethers-contracts
 server/generated
 src/generated
+server/sms-outbox
 .git
 .env
 *.log

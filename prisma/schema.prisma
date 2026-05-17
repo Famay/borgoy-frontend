@@ -28,6 +28,9 @@ enum CertificateStatus {
 enum AuditAction {
   USER_REGISTERED
   USER_LOGIN
+  USER_LOGIN_2FA_FAILED
+  TWO_FACTOR_ENABLED
+  TWO_FACTOR_DISABLED
   BATCH_CREATED
   CERTIFICATE_UPLOADED
   CERTIFICATE_STATUS_UPDATED
@@ -37,17 +40,22 @@ enum AuditAction {
 }
 
 model User {
-  id           String     @id @default(uuid())
-  name         String
-  companyName  String?
-  email        String     @unique
-  phone        String?
-  inn          String?
-  passwordHash String
-  role         UserRole   @default(SUPPLIER)
-  status       UserStatus @default(ACTIVE)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id                     String     @id @default(uuid())
+  name                   String
+  companyName            String?
+  email                  String     @unique
+  phone                  String?
+  inn                    String?
+  passwordHash           String
+  role                   UserRole   @default(SUPPLIER)
+  status                 UserStatus @default(ACTIVE)
+  twoFactorEnabled       Boolean    @default(true)
+  twoFactorCodeHash      String?
+  twoFactorCodeExpiresAt DateTime?
+  twoFactorCodeAttempts  Int        @default(0)
+  twoFactorCodeSentAt    DateTime?
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
 
   batches   Batch[]
   auditLogs AuditLog[]

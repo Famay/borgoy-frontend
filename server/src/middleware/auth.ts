@@ -1,14 +1,20 @@
 import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import type { JwtPayload as JsonWebTokenPayload, SignOptions } from "jsonwebtoken";
-import { UserRole } from "../../generated/prisma/enums";
+import { UserRole, UserStatus } from "../../generated/prisma/enums";
 import { env } from "../config/env";
+import { prisma } from "../db/prisma";
 import { HttpError } from "../utils/httpError";
 
 interface AccessTokenPayload {
   sub: string;
   role: UserRole;
   email: string;
+}
+
+interface TwoFactorChallengePayload {
+  sub: string;
+  purpose: "two-factor-login";
 }
 
 function isUserRole(role: unknown): role is UserRole {
@@ -34,6 +40,23 @@ function parseAccessTokenPayload(
   };
 }
 
+function parseTwoFactorChallengePayload(
+  payload: string | JsonWebTokenPayload
+): TwoFactorChallengePayload {
+  if (
+    typeof payload === "string" ||
+    typeof payload.sub !== "string" ||
+    payload.purpose !== "two-factor-login"
+  ) {
+    throw new HttpError(401, "Недействительный код подтверждения");
+  }
+
+  return {
+    sub: payload.sub,
+    purpose: "two-factor-login",
+  };
+}
+
 export function signAccessToken(payload: AccessTokenPayload) {
   const options: SignOptions = {
     expiresIn: env.JWT_EXPIRES_IN as SignOptions["expiresIn"],
@@ -42,7 +65,22 @@ export function signAccessToken(payload: AccessTokenPayload) {
   return jwt.sign(payload, env.JWT_SECRET, options);
 }
 
-export function requireAuth(
+export function signTwoFactorChallengeToken(userId: string) {
+  return jwt.sign(
+    {
+      sub: userId,
+      purpose: "two-factor-login",
+    },
+    env.JWT_SECRET,
+    { expiresIn: "5m" }
+  );
+}
+
+export function verifyTwoFactorChallengeToken(token: string) {
+  return parseTwoFactorChallengePayload(jwt.verify(token, env.JWT_SECRET));
+}
+
+export async function requireAuth(
   req: Request,
   _res: Response,
   next: NextFunction
@@ -57,10 +95,35 @@ export function requireAuth(
 
   try {
     const payload = parseAccessTokenPayload(jwt.verify(token, env.JWT_SECRET));
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        status: true,
+      },
+    });
+
+    if (!user) {
+      next(new HttpError(401, "Недействительный токен"));
+      return;
+    }
+
+    if (user.status === UserStatus.BLOCKED) {
+      next(new HttpError(403, "Учетная запись заблокирована"));
+      return;
+    }
+
+    if (user.status !== UserStatus.ACTIVE) {
+      next(new HttpError(403, "Учетная запись ожидает подтверждения"));
+      return;
+    }
+
     req.user = {
-      id: payload.sub,
-      role: payload.role,
-      email: payload.email,
+      id: user.id,
+      role: user.role,
+      email: user.email,
     };
     next();
   } catch {

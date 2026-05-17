@@ -7,4 +7,5 @@ export interface AuthUser {
   role: UserRole;
   companyName?: string | null;
   status?: string;
+  twoFactorEnabled?: boolean;
 }

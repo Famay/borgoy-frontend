@@ -13,22 +13,31 @@ const CertificatesContext = createContext<CertificatesContextValue | undefined>(
 );
 
 const CERTIFICATES_STORAGE_KEY = "vermeat.certificates";
+const SEED_CERTIFICATE_IDS = new Set(certificatesSeed.map((item) => item.id));
+
+function isSeedCertificate(entry: Partial<Certificate>) {
+  return Boolean(
+    entry.id &&
+      SEED_CERTIFICATE_IDS.has(entry.id) &&
+      entry.ipfsCid?.includes("demo")
+  );
+}
 
 function normalizeCertificate(entry: Partial<Certificate>, index: number) {
-  const fallback = certificatesSeed[index] ?? certificatesSeed[0];
+  const defaults = certificatesSeed[index] ?? certificatesSeed[0];
 
   return {
-    ...fallback,
+    ...defaults,
     ...entry,
-    batchNumber: entry.batchNumber ?? fallback.batchNumber,
-    originRegion: entry.originRegion ?? fallback.originRegion,
-    productionDate: entry.productionDate ?? fallback.productionDate,
-    weightKg: entry.weightKg ?? fallback.weightKg,
-    documentNumber: entry.documentNumber ?? fallback.documentNumber,
-    qrToken: entry.qrToken ?? fallback.qrToken,
-    qrPayload: entry.qrPayload ?? fallback.qrPayload,
-    qrCodeDataUrl: entry.qrCodeDataUrl ?? fallback.qrCodeDataUrl,
-    publicUrl: entry.publicUrl ?? fallback.publicUrl,
+    batchNumber: entry.batchNumber ?? defaults.batchNumber,
+    originRegion: entry.originRegion ?? defaults.originRegion,
+    productionDate: entry.productionDate ?? defaults.productionDate,
+    weightKg: entry.weightKg ?? defaults.weightKg,
+    documentNumber: entry.documentNumber ?? defaults.documentNumber,
+    qrToken: entry.qrToken ?? defaults.qrToken,
+    qrPayload: entry.qrPayload ?? defaults.qrPayload,
+    qrCodeDataUrl: entry.qrCodeDataUrl ?? defaults.qrCodeDataUrl,
+    publicUrl: entry.publicUrl ?? defaults.publicUrl,
   };
 }
 
@@ -36,20 +45,33 @@ function readStoredCertificates() {
   const stored = localStorage.getItem(CERTIFICATES_STORAGE_KEY);
 
   if (!stored) {
-    return certificatesSeed;
+    return [];
   }
 
   try {
     const parsed = JSON.parse(stored);
 
-    return Array.isArray(parsed)
-      ? parsed.map((entry, index) =>
-          normalizeCertificate(entry as Partial<Certificate>, index)
-        )
-      : certificatesSeed;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    const productionEntries = parsed.filter(
+      (entry) => !isSeedCertificate(entry as Partial<Certificate>)
+    );
+
+    if (productionEntries.length !== parsed.length) {
+      localStorage.setItem(
+        CERTIFICATES_STORAGE_KEY,
+        JSON.stringify(productionEntries)
+      );
+    }
+
+    return productionEntries.map((entry, index) =>
+      normalizeCertificate(entry as Partial<Certificate>, index)
+    );
   } catch {
     localStorage.removeItem(CERTIFICATES_STORAGE_KEY);
-    return certificatesSeed;
+    return [];
   }
 }
 

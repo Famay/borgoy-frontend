@@ -12,33 +12,77 @@ interface LocationState {
 export default function LoginPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, verifyTwoFactorLogin } = useAuth();
 
   const [form, setForm] = useState({
-    email: "supplier@vermeat.ru",
-    password: "supplier123",
+    email: "",
+    password: "",
   });
+  const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [twoFactorChallengeToken, setTwoFactorChallengeToken] = useState("");
+  const [twoFactorPhone, setTwoFactorPhone] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isTwoFactorStep = twoFactorChallengeToken.length > 0;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setIsSubmitting(true);
+  const navigateAfterLogin = (role: "guest" | "supplier" | "admin") => {
+    const state = location.state as LocationState | null;
+    const nextPath = state?.from?.pathname ?? getDefaultRouteForRole(role);
 
+    navigate(nextPath, { replace: true });
+  };
+
+  const handlePasswordSubmit = async () => {
     const result = await login(form);
-    setIsSubmitting(false);
+
+    if (result.twoFactorRequired && result.challengeToken) {
+      setTwoFactorChallengeToken(result.challengeToken);
+      setTwoFactorPhone(result.phoneMasked ?? "");
+      setTwoFactorCode("");
+      return;
+    }
 
     if (!result.success) {
       setError(result.message || "Ошибка входа");
       return;
     }
 
-    const state = location.state as LocationState | null;
-    const nextPath =
-      state?.from?.pathname ?? getDefaultRouteForRole(result.user?.role ?? "guest");
+    navigateAfterLogin(result.user?.role ?? "guest");
+  };
 
-    navigate(nextPath, { replace: true });
+  const handleTwoFactorSubmit = async () => {
+    const result = await verifyTwoFactorLogin({
+      challengeToken: twoFactorChallengeToken,
+      code: twoFactorCode,
+    });
+
+    if (!result.success) {
+      setError(result.message || "Неверный код подтверждения");
+      return;
+    }
+
+    navigateAfterLogin(result.user?.role ?? "guest");
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setIsSubmitting(true);
+
+    if (isTwoFactorStep) {
+      await handleTwoFactorSubmit();
+    } else {
+      await handlePasswordSubmit();
+    }
+
+    setIsSubmitting(false);
+  };
+
+  const resetTwoFactorStep = () => {
+    setTwoFactorChallengeToken("");
+    setTwoFactorPhone("");
+    setTwoFactorCode("");
+    setError("");
   };
 
   return (
@@ -46,34 +90,61 @@ export default function LoginPage() {
       <div className="auth-card auth-card--small">
         <div className="auth-card__header">
           <div className="auth-card__badge">VerMeat</div>
-          <h1 className="auth-card__title">Вход в систему</h1>
+          <h1 className="auth-card__title">
+            {isTwoFactorStep ? "Подтверждение входа" : "Вход в систему"}
+          </h1>
           <p className="auth-card__text">
-            Войдите через backend API, чтобы работать с партиями и сертификатами в PostgreSQL.
+            {isTwoFactorStep
+              ? `Введите 6-значный код, отправленный по SMS${twoFactorPhone ? ` на номер ${twoFactorPhone}` : ""}.`
+              : "Войдите в личный кабинет для работы с партиями, сертификатами и проверками продукции."}
           </p>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              placeholder="Введите email"
-            />
-          </div>
+          {isTwoFactorStep ? (
+            <div className="form-group">
+              <label htmlFor="twoFactorCode">Код подтверждения</label>
+              <input
+                id="twoFactorCode"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                value={twoFactorCode}
+                onChange={(e) =>
+                  setTwoFactorCode(e.target.value.replace(/\D/g, ""))
+                }
+                placeholder="000000"
+              />
+            </div>
+          ) : (
+            <>
+              <div className="form-group">
+                <label htmlFor="email">Email</label>
+                <input
+                  id="email"
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  placeholder="Введите email"
+                />
+              </div>
 
-          <div className="form-group">
-            <label htmlFor="password">Пароль</label>
-            <input
-              id="password"
-              type="password"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              placeholder="Введите пароль"
-            />
-          </div>
+              <div className="form-group">
+                <label htmlFor="password">Пароль</label>
+                <input
+                  id="password"
+                  type="password"
+                  value={form.password}
+                  onChange={(e) =>
+                    setForm({ ...form, password: e.target.value })
+                  }
+                  placeholder="Введите пароль"
+                />
+              </div>
+            </>
+          )}
 
           {error && <div className="form-error">{error}</div>}
 
@@ -82,19 +153,24 @@ export default function LoginPage() {
             className="button button--primary auth-form__submit"
             disabled={isSubmitting}
           >
-            {isSubmitting ? "Вход..." : "Войти"}
+            {isSubmitting
+              ? "Проверка..."
+              : isTwoFactorStep
+                ? "Подтвердить"
+                : "Войти"}
           </button>
-        </form>
 
-        <div className="demo-users">
-          <div className="demo-users__title">Тестовые учетные записи из seed</div>
-          <div className="demo-users__item">
-            <strong>Поставщик:</strong> supplier@vermeat.ru / supplier123
-          </div>
-          <div className="demo-users__item">
-            <strong>Админ:</strong> admin@vermeat.ru / admin123
-          </div>
-        </div>
+          {isTwoFactorStep && (
+            <button
+              type="button"
+              className="button button--secondary auth-form__submit"
+              onClick={resetTwoFactorStep}
+              disabled={isSubmitting}
+            >
+              Вернуться к паролю
+            </button>
+          )}
+        </form>
       </div>
     </section>
   );

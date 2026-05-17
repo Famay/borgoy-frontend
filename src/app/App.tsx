@@ -8,6 +8,7 @@ import SupplierPage from "../pages/SupplierPage";
 import RegistryPage from "../pages/RegistryPage";
 import VerifyPage from "../pages/VerifyPage";
 import ProfilePage from "../pages/ProfilePage";
+import MyCertificatesPage from "../pages/MyCertificatesPage";
 import LoginPage from "../pages/LoginPage";
 import RegisterPage from "../pages/RegisterPage";
 import AdminLogsPage from "../pages/AdminLogsPage";
@@ -47,6 +48,15 @@ export default function App() {
                 element={
                   <ProtectedRoute allowedRoles={["supplier", "admin"]}>
                     <ProfilePage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/my-certificates"
+                element={
+                  <ProtectedRoute allowedRoles={["supplier"]}>
+                    <MyCertificatesPage />
                   </ProtectedRoute>
                 }
               />

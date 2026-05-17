@@ -1,6 +1,11 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useMemo, useState } from "react";
-import { loginRequest, registerRequest, type RegisterPayload } from "../services/api";
+import {
+  loginRequest,
+  registerRequest,
+  verifyTwoFactorLoginRequest,
+  type RegisterPayload,
+} from "../services/api";
 import type { AuthUser } from "../types/auth";
 
 interface LoginPayload {
@@ -8,10 +13,18 @@ interface LoginPayload {
   password: string;
 }
 
+interface TwoFactorLoginPayload {
+  challengeToken: string;
+  code: string;
+}
+
 interface AuthResult {
   success: boolean;
   user?: AuthUser;
   message?: string;
+  twoFactorRequired?: boolean;
+  challengeToken?: string;
+  phoneMasked?: string;
 }
 
 interface AuthSession {
@@ -24,7 +37,9 @@ interface AuthContextValue {
   token: string | null;
   isAuthenticated: boolean;
   login: (payload: LoginPayload) => Promise<AuthResult>;
+  verifyTwoFactorLogin: (payload: TwoFactorLoginPayload) => Promise<AuthResult>;
   register: (payload: RegisterPayload) => Promise<AuthResult>;
+  updateUser: (user: AuthUser) => void;
   logout: () => void;
 }
 
@@ -63,7 +78,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAuthenticated: session !== null,
       login: async ({ email, password }: LoginPayload) => {
         try {
-          const nextSession = await loginRequest(email, password);
+          const result = await loginRequest(email, password);
+
+          if (result.twoFactorRequired) {
+            return {
+              success: false,
+              twoFactorRequired: true,
+              challengeToken: result.challengeToken,
+              phoneMasked: result.phoneMasked,
+            };
+          }
+
+          persistSession({ user: result.user, token: result.token });
+
+          return { success: true, user: result.user };
+        } catch (error) {
+          return {
+            success: false,
+            message:
+              error instanceof Error ? error.message : "Ошибка входа в систему",
+          };
+        }
+      },
+      verifyTwoFactorLogin: async ({
+        challengeToken,
+        code,
+      }: TwoFactorLoginPayload) => {
+        try {
+          const nextSession = await verifyTwoFactorLoginRequest(
+            challengeToken,
+            code
+          );
           persistSession(nextSession);
 
           return { success: true, user: nextSession.user };
@@ -71,7 +116,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return {
             success: false,
             message:
-              error instanceof Error ? error.message : "Ошибка входа в систему",
+              error instanceof Error
+                ? error.message
+                : "Ошибка подтверждения второго фактора",
           };
         }
       },
@@ -90,6 +137,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 : "Ошибка регистрации поставщика",
           };
         }
+      },
+      updateUser: (user: AuthUser) => {
+        if (!session) {
+          return;
+        }
+
+        persistSession({ ...session, user });
       },
       logout: () => {
         setSession(null);

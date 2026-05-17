@@ -17,6 +17,7 @@ interface ApiUser {
   email: string;
   role: ApiRole;
   status: string;
+  twoFactorEnabled: boolean;
 }
 
 interface ApiBatch {
@@ -60,6 +61,24 @@ interface AuthResponse {
   user: ApiUser;
   token: string;
 }
+
+interface TwoFactorChallengeResponse {
+  twoFactorRequired: true;
+  challengeToken: string;
+  phoneMasked: string;
+}
+
+export type LoginRequestResult =
+  | {
+      twoFactorRequired: false;
+      user: AuthUser;
+      token: string;
+    }
+  | {
+      twoFactorRequired: true;
+      challengeToken: string;
+      phoneMasked: string;
+    };
 
 interface ApiAuditLog {
   id: string;
@@ -119,7 +138,7 @@ export interface RegisterPayload {
   name: string;
   companyName: string;
   email: string;
-  phone?: string;
+  phone: string;
   inn?: string;
   password: string;
 }
@@ -161,6 +180,9 @@ function mapAuditAction(action: string) {
   const labels: Record<string, string> = {
     USER_REGISTERED: "Регистрация пользователя",
     USER_LOGIN: "Вход в систему",
+    USER_LOGIN_2FA_FAILED: "Ошибка второго фактора",
+    TWO_FACTOR_ENABLED: "Двухфакторный вход включен",
+    TWO_FACTOR_DISABLED: "Двухфакторный вход отключен",
     BATCH_CREATED: "Создание партии",
     CERTIFICATE_UPLOADED: "Загрузка сертификата",
     CERTIFICATE_STATUS_UPDATED: "Изменение статуса сертификата",
@@ -232,6 +254,7 @@ function mapUser(user: ApiUser): AuthUser {
     role: mapRole(user.role),
     companyName: user.companyName,
     status: user.status,
+    twoFactorEnabled: user.twoFactorEnabled,
   };
 }
 
@@ -289,7 +312,7 @@ async function request<T>(
     });
   } catch {
     throw new Error(
-      `API недоступен: ${API_URL}. Проверьте, что запущен npm run dev:api и CORS разрешает адрес frontend.`
+      "Сервис временно недоступен. Повторите попытку позже."
     );
   }
 
@@ -305,7 +328,7 @@ async function request<T>(
       "message" in payload &&
       payload.message
         ? payload.message
-        : "Ошибка запроса к API";
+        : "Не удалось выполнить запрос";
 
     throw new Error(errorMessage);
   }
@@ -313,10 +336,46 @@ async function request<T>(
   return payload as T;
 }
 
-export async function loginRequest(email: string, password: string) {
-  const response = await request<AuthResponse>("/auth/login", {
+function isTwoFactorChallengeResponse(
+  response: AuthResponse | TwoFactorChallengeResponse
+): response is TwoFactorChallengeResponse {
+  return "twoFactorRequired" in response && response.twoFactorRequired;
+}
+
+export async function loginRequest(
+  email: string,
+  password: string
+): Promise<LoginRequestResult> {
+  const response = await request<AuthResponse | TwoFactorChallengeResponse>(
+    "/auth/login",
+    {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }
+  );
+
+  if (isTwoFactorChallengeResponse(response)) {
+    return {
+      twoFactorRequired: true,
+      challengeToken: response.challengeToken,
+      phoneMasked: response.phoneMasked,
+    };
+  }
+
+  return {
+    twoFactorRequired: false,
+    user: mapUser(response.user),
+    token: response.token,
+  };
+}
+
+export async function verifyTwoFactorLoginRequest(
+  challengeToken: string,
+  code: string
+) {
+  const response = await request<AuthResponse>("/auth/login/2fa", {
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ challengeToken, code }),
   });
 
   return {
@@ -426,7 +485,7 @@ export async function verifyCertificateRequest(query: string) {
   } catch {
     return {
       isValid: false,
-      message: `API недоступен: ${API_URL}. Проверьте, что запущен npm run dev:api.`,
+      message: "Сервис проверки временно недоступен. Повторите попытку позже.",
       certificate: null,
     };
   }
