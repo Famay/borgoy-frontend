@@ -132,6 +132,17 @@ docker compose exec api npx prisma db seed
 
 В Docker-режиме фронтенд доступен на `http://localhost`, API проксируется через Nginx по пути `/api`.
 
+## Деплой на сервер
+
+Для боевого запуска добавлен отдельный Docker Compose файл:
+
+- `docker-compose.prod.yml` - PostgreSQL, API, Nginx-фронтенд и Certbot;
+- `nginx/templates/http.conf.template` - первичный HTTP-конфиг для выпуска сертификата;
+- `nginx/templates/ssl.conf.template` - HTTPS-конфиг после выпуска сертификата;
+- `.env.production.example` - пример переменных окружения для сервера.
+
+Пошаговая инструкция находится в [docs/deployment.md](docs/deployment.md).
+
 ## Основные команды
 
 - `npm run dev` - запустить фронтенд в режиме разработки.

@@ -1,0 +1,80 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vermeat}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-vermeat}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - vermeat
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-vermeat}?schema=public
+      SERVER_PORT: 4000
+      CLIENT_ORIGIN: ${PUBLIC_APP_URL:?PUBLIC_APP_URL is required}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:?PUBLIC_APP_URL is required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "npm run prisma:deploy && npm run start:api"
+    expose:
+      - "4000"
+    networks:
+      - vermeat
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        VITE_API_URL: ${DOCKER_VITE_API_URL:-/api}
+    restart: unless-stopped
+    environment:
+      SERVER_NAME: ${SERVER_NAME:?SERVER_NAME is required}
+      CERTBOT_DOMAIN: ${CERTBOT_DOMAIN:?CERTBOT_DOMAIN is required}
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - certbot-www:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt:ro
+      - ${NGINX_TEMPLATE:-./nginx/templates/http.conf.template}:/etc/nginx/templates/default.conf.template:ro
+    networks:
+      - vermeat
+
+  certbot:
+    image: certbot/certbot:latest
+    profiles:
+      - certbot
+    volumes:
+      - certbot-www:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt
+
+volumes:
+  postgres-data:
+  certbot-www:
+  letsencrypt:
+
+networks:
+  vermeat:
