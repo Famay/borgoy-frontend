@@ -8,6 +8,7 @@
     "dev:api": "tsx watch server/src/index.ts",
     "start:api": "tsx server/src/index.ts",
     "build": "tsc -b && vite build",
+    "build:web": "tsc -b tsconfig.app.json tsconfig.node.json && vite build",
     "server:typecheck": "tsc -p tsconfig.server.json --noEmit",
     "lint": "eslint .",
     "preview": "vite preview",

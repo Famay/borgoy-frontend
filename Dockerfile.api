@@ -2,6 +2,8 @@ FROM node:22-alpine
 
 WORKDIR /app
 
+ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
+
 COPY package*.json ./
 RUN npm ci
 
