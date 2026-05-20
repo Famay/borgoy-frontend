@@ -9,7 +9,7 @@ import {
   signTwoFactorChallengeToken,
   verifyTwoFactorChallengeToken,
 } from "../../middleware/auth";
-import { sendTwoFactorSms, maskPhone } from "../../services/sms.service";
+import { maskEmail, sendTwoFactorEmail } from "../../services/email.service";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { HttpError } from "../../utils/httpError";
 import { generateOtpCode, hashOtpCode, verifyOtpCode } from "../../utils/otp";
@@ -21,7 +21,12 @@ const registerSchema = z.object({
   name: z.string().min(2),
   companyName: z.string().min(2).optional(),
   email: z.string().email(),
-  phone: z.string().min(6),
+  phone: z
+    .string()
+    .trim()
+    .min(6)
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
   inn: z.string().min(10).max(12).optional(),
   password: z.string().min(8),
 });
@@ -49,7 +54,6 @@ interface AuthUserShape {
 interface TwoFactorUser {
   id: string;
   email: string;
-  phone: string | null;
   twoFactorCodeHash: string | null;
   twoFactorCodeExpiresAt: Date | null;
   twoFactorCodeAttempts: number;
@@ -79,17 +83,6 @@ function assertUserCanLogin(user: { status: UserStatus }) {
   }
 }
 
-function assertTwoFactorPhone(user: { phone: string | null }) {
-  if (!user.phone?.trim()) {
-    throw new HttpError(
-      409,
-      "Для входа требуется телефон. Обратитесь к администратору, чтобы добавить номер."
-    );
-  }
-
-  return user.phone;
-}
-
 async function writeLoginAudit(userId: string, twoFactorUsed: boolean) {
   await prisma.auditLog.create({
     data: {
@@ -108,9 +101,7 @@ async function writeLoginAudit(userId: string, twoFactorUsed: boolean) {
 async function issueTwoFactorCode(user: {
   id: string;
   email: string;
-  phone: string | null;
 }) {
-  const phone = assertTwoFactorPhone(user);
   const code = generateOtpCode();
   const expiresAt = new Date(Date.now() + TWO_FACTOR_CODE_TTL_MS);
 
@@ -124,15 +115,14 @@ async function issueTwoFactorCode(user: {
     },
   });
 
-  await sendTwoFactorSms({
-    phone,
+  await sendTwoFactorEmail({
+    email: user.email,
     code,
-    userEmail: user.email,
   });
 
   return {
     challengeToken: signTwoFactorChallengeToken(user.id),
-    phoneMasked: maskPhone(phone),
+    emailMasked: maskEmail(user.email),
   };
 }
 
@@ -247,7 +237,7 @@ authRouter.post(
       res.json({
         twoFactorRequired: true,
         challengeToken: challenge.challengeToken,
-        phoneMasked: challenge.phoneMasked,
+        emailMasked: challenge.emailMasked,
       });
       return;
     }

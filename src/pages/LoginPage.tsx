@@ -20,7 +20,7 @@ export default function LoginPage() {
   });
   const [twoFactorCode, setTwoFactorCode] = useState("");
   const [twoFactorChallengeToken, setTwoFactorChallengeToken] = useState("");
-  const [twoFactorPhone, setTwoFactorPhone] = useState("");
+  const [twoFactorEmail, setTwoFactorEmail] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isTwoFactorStep = twoFactorChallengeToken.length > 0;
@@ -37,7 +37,7 @@ export default function LoginPage() {
 
     if (result.twoFactorRequired && result.challengeToken) {
       setTwoFactorChallengeToken(result.challengeToken);
-      setTwoFactorPhone(result.phoneMasked ?? "");
+      setTwoFactorEmail(result.emailMasked ?? "");
       setTwoFactorCode("");
       return;
     }
@@ -80,7 +80,7 @@ export default function LoginPage() {
 
   const resetTwoFactorStep = () => {
     setTwoFactorChallengeToken("");
-    setTwoFactorPhone("");
+    setTwoFactorEmail("");
     setTwoFactorCode("");
     setError("");
   };
@@ -95,7 +95,7 @@ export default function LoginPage() {
           </h1>
           <p className="auth-card__text">
             {isTwoFactorStep
-              ? `Введите 6-значный код, отправленный по SMS${twoFactorPhone ? ` на номер ${twoFactorPhone}` : ""}.`
+              ? `Введите 6-значный код, отправленный на email${twoFactorEmail ? ` ${twoFactorEmail}` : ""}.`
               : "Войдите в личный кабинет для работы с партиями, сертификатами и проверками продукции."}
           </p>
         </div>

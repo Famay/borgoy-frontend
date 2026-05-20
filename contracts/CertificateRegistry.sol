@@ -2,6 +2,8 @@
 pragma solidity ^0.8.28;
 
 contract CertificateRegistry {
+  address public owner;
+
   struct Certificate {
     bytes32 documentHash;
     string cid;
@@ -11,6 +13,11 @@ contract CertificateRegistry {
   }
 
   mapping(bytes32 certificateId => Certificate certificate) private certificates;
+
+  event OwnershipTransferred(
+    address indexed previousOwner,
+    address indexed newOwner
+  );
 
   event CertificateRegistered(
     bytes32 indexed certificateId,
@@ -23,12 +30,38 @@ contract CertificateRegistry {
   error EmptyCertificateId();
   error EmptyDocumentHash();
   error EmptyCid();
+  error InvalidOwner();
+  error Unauthorized();
+
+  modifier onlyOwner() {
+    if (msg.sender != owner) {
+      revert Unauthorized();
+    }
+
+    _;
+  }
+
+  constructor() {
+    owner = msg.sender;
+    emit OwnershipTransferred(address(0), msg.sender);
+  }
+
+  function transferOwnership(address newOwner) external onlyOwner {
+    if (newOwner == address(0)) {
+      revert InvalidOwner();
+    }
+
+    address previousOwner = owner;
+    owner = newOwner;
+
+    emit OwnershipTransferred(previousOwner, newOwner);
+  }
 
   function registerCertificate(
     bytes32 certificateId,
     bytes32 documentHash,
     string calldata cid
-  ) external {
+  ) external onlyOwner {
     if (certificateId == bytes32(0)) {
       revert EmptyCertificateId();
     }

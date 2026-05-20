@@ -24,7 +24,7 @@ interface AuthResult {
   message?: string;
   twoFactorRequired?: boolean;
   challengeToken?: string;
-  phoneMasked?: string;
+  emailMasked?: string;
 }
 
 interface AuthSession {
@@ -85,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               success: false,
               twoFactorRequired: true,
               challengeToken: result.challengeToken,
-              phoneMasked: result.phoneMasked,
+              emailMasked: result.emailMasked,
             };
           }
 

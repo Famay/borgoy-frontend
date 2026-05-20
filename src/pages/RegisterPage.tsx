@@ -27,18 +27,13 @@ export default function RegisterPage() {
       return;
     }
 
-    if (!form.phone.trim()) {
-      setError("Укажите телефон для SMS-кодов входа");
-      return;
-    }
-
     setIsSubmitting(true);
 
     const result = await register({
       name: form.contactName,
       companyName: form.companyName,
       email: form.email,
-      phone: form.phone,
+      phone: form.phone || undefined,
       inn: form.inn || undefined,
       password: form.password,
     });
@@ -102,13 +97,13 @@ export default function RegisterPage() {
             </div>
 
             <div className="form-group">
-              <label htmlFor="phone">Телефон для SMS-кодов</label>
+              <label htmlFor="phone">Телефон</label>
               <input
                 id="phone"
                 type="text"
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                placeholder="+7 (999) 123-45-67"
+                placeholder="Необязательно"
               />
             </div>
           </div>

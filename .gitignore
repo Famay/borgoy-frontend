@@ -14,7 +14,6 @@ dist-ssr
 .env
 .env.*
 !.env.example
-!.env.production.example
 
 # Editor directories and files
 .vscode/*
@@ -31,6 +30,7 @@ dist-ssr
 /server/generated/prisma
 /server/uploads
 /server/sms-outbox
+/server/email-outbox
 
 # Hardhat generated output
 /artifacts

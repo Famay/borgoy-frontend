@@ -37,6 +37,8 @@ interface ApiBatch {
 
 interface ApiBlockchainTransaction {
   txHash: string;
+  contract?: string | null;
+  blockNumber?: number | null;
 }
 
 interface ApiCertificate {
@@ -51,6 +53,7 @@ interface ApiCertificate {
   fileSize: number;
   fileHash: string;
   ipfsCid?: string | null;
+  ipfsGatewayUrl?: string | null;
   qrPayload?: string | null;
   qrCodeDataUrl?: string | null;
   batch: ApiBatch;
@@ -65,7 +68,7 @@ interface AuthResponse {
 interface TwoFactorChallengeResponse {
   twoFactorRequired: true;
   challengeToken: string;
-  phoneMasked: string;
+  emailMasked: string;
 }
 
 export type LoginRequestResult =
@@ -77,7 +80,7 @@ export type LoginRequestResult =
   | {
       twoFactorRequired: true;
       challengeToken: string;
-      phoneMasked: string;
+      emailMasked: string;
     };
 
 interface ApiAuditLog {
@@ -138,7 +141,7 @@ export interface RegisterPayload {
   name: string;
   companyName: string;
   email: string;
-  phone: string;
+  phone?: string;
   inn?: string;
   password: string;
 }
@@ -258,8 +261,17 @@ function mapUser(user: ApiUser): AuthUser {
   };
 }
 
+function createIpfsUrl(cid?: string | null) {
+  if (!cid) {
+    return undefined;
+  }
+
+  return `https://ipfs.io/ipfs/${encodeURIComponent(cid)}`;
+}
+
 export function mapCertificate(certificate: ApiCertificate): Certificate {
   const publicUrl = `/verify?token=${certificate.batch.publicToken}`;
+  const blockchainTransaction = certificate.blockchainTransaction;
 
   return {
     id: certificate.certificateNo,
@@ -282,6 +294,9 @@ export function mapCertificate(certificate: ApiCertificate): Certificate {
     fileName: certificate.fileName,
     fileSize: certificate.fileSize,
     ipfsCid: certificate.ipfsCid ?? undefined,
+    ipfsUrl: certificate.ipfsGatewayUrl ?? createIpfsUrl(certificate.ipfsCid),
+    blockchainContract: blockchainTransaction?.contract ?? undefined,
+    blockchainBlockNumber: blockchainTransaction?.blockNumber ?? undefined,
     qrToken: certificate.batch.publicToken,
     qrPayload: certificate.qrPayload ?? undefined,
     qrCodeDataUrl: certificate.qrCodeDataUrl ?? undefined,
@@ -358,7 +373,7 @@ export async function loginRequest(
     return {
       twoFactorRequired: true,
       challengeToken: response.challengeToken,
-      phoneMasked: response.phoneMasked,
+      emailMasked: response.emailMasked,
     };
   }
 

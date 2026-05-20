@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useAuth } from "../app/AuthContext";
 import { useCertificates } from "../app/CertificatesContext";
+import CertificateEvidence from "../components/certificates/CertificateEvidence";
+import CertificateQr from "../components/certificates/CertificateQr";
 import type { Certificate, SupplierForm } from "../types/certificate";
 import { formatFileSize, shortenHash } from "../utils/certificates";
 import { calculateSha256 } from "../utils/fileHash";
@@ -299,12 +301,7 @@ export default function SupplierPage() {
         {lastCertificate && (
           <div className="success-panel">
             <div className="qr-preview">
-              {lastCertificate.qrCodeDataUrl && (
-                <img
-                  src={lastCertificate.qrCodeDataUrl}
-                  alt={`QR-код для ${lastCertificate.id}`}
-                />
-              )}
+              <CertificateQr certificate={lastCertificate} />
               <div>
                 <div>
                   <strong>{lastCertificate.id}</strong> добавлен в реестр.
@@ -314,6 +311,7 @@ export default function SupplierPage() {
                 </a>
               </div>
             </div>
+            <CertificateEvidence certificate={lastCertificate} />
           </div>
         )}
 

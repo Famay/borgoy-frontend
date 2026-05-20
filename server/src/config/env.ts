@@ -16,6 +16,9 @@ const envSchema = z.object({
   POLYGON_AMOY_RPC_URL: z.string().optional(),
   POLYGON_PRIVATE_KEY: z.string().optional(),
   CERTIFICATE_CONTRACT_ADDRESS: z.string().optional(),
+  TWO_FACTOR_EMAIL_PROVIDER: z.enum(["file", "resend"]).default("file"),
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);

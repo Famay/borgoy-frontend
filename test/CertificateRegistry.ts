@@ -14,6 +14,7 @@ describe("CertificateRegistry", function () {
     const [issuer] = await ethers.getSigners();
     const registry = await ethers.deployContract("CertificateRegistry");
 
+    await expect(registry.owner()).to.eventually.equal(issuer.address);
     await expect(registry.registerCertificate(certificateId, documentHash, cid))
       .to.emit(registry, "CertificateRegistered")
       .withArgs(certificateId, documentHash, cid, issuer.address);
@@ -70,5 +71,46 @@ describe("CertificateRegistry", function () {
     await expect(
       registry.registerCertificate(certificateId, documentHash, "")
     ).to.be.revertedWithCustomError(registry, "EmptyCid");
+  });
+
+  it("rejects registration from a non-owner", async function () {
+    const [, stranger] = await ethers.getSigners();
+    const registry = await ethers.deployContract("CertificateRegistry");
+
+    await expect(
+      registry
+        .connect(stranger)
+        .registerCertificate(certificateId, documentHash, cid)
+    ).to.be.revertedWithCustomError(registry, "Unauthorized");
+  });
+
+  it("transfers ownership", async function () {
+    const [issuer, nextOwner] = await ethers.getSigners();
+    const registry = await ethers.deployContract("CertificateRegistry");
+
+    await expect(registry.transferOwnership(nextOwner.address))
+      .to.emit(registry, "OwnershipTransferred")
+      .withArgs(issuer.address, nextOwner.address);
+    await expect(registry.owner()).to.eventually.equal(nextOwner.address);
+
+    await expect(
+      registry.registerCertificate(certificateId, documentHash, cid)
+    ).to.be.revertedWithCustomError(registry, "Unauthorized");
+
+    await expect(
+      registry
+        .connect(nextOwner)
+        .registerCertificate(certificateId, documentHash, cid)
+    )
+      .to.emit(registry, "CertificateRegistered")
+      .withArgs(certificateId, documentHash, cid, nextOwner.address);
+  });
+
+  it("rejects zero address ownership transfer", async function () {
+    const registry = await ethers.deployContract("CertificateRegistry");
+
+    await expect(
+      registry.transferOwnership(ethers.ZeroAddress)
+    ).to.be.revertedWithCustomError(registry, "InvalidOwner");
   });
 });

@@ -17,10 +17,39 @@ const localDevOrigins = [
   "http://127.0.0.1:5173",
 ];
 
+function getOriginVariants(origin: string) {
+  const variants = new Set<string>();
+
+  try {
+    const url = new URL(origin);
+    variants.add(url.origin);
+
+    if (url.hostname.startsWith("www.")) {
+      url.hostname = url.hostname.slice(4);
+      variants.add(url.origin);
+    } else {
+      url.hostname = `www.${url.hostname}`;
+      variants.add(url.origin);
+    }
+  } catch {
+    variants.add(origin);
+  }
+
+  return variants;
+}
+
 function getAllowedOrigins() {
-  return new Set(
-    [env.CLIENT_ORIGIN, env.PUBLIC_APP_URL, ...localDevOrigins].filter(Boolean)
-  );
+  const allowedOrigins = new Set<string>();
+
+  [env.CLIENT_ORIGIN, env.PUBLIC_APP_URL, ...localDevOrigins]
+    .filter(Boolean)
+    .forEach((origin) => {
+      getOriginVariants(origin).forEach((variant) => {
+        allowedOrigins.add(variant);
+      });
+    });
+
+  return allowedOrigins;
 }
 
 function isAllowedCorsOrigin(origin: string | undefined) {

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useCertificates } from "../app/CertificatesContext";
+import CertificateEvidence from "../components/certificates/CertificateEvidence";
 import StatusBadge from "../components/ui/StatusBadge";
 import { verifyCertificateRequest } from "../services/api";
 import type { Certificate } from "../types/certificate";
-import { formatFileSize, shortenHash } from "../utils/certificates";
 
 interface DetectedBarcode {
   rawValue: string;
@@ -376,28 +376,7 @@ export default function VerifyPage() {
               </div>
             </div>
 
-            <div className="blockchain-box">
-              <div className="blockchain-box__title">Контрольные данные</div>
-              <div className="blockchain-box__row">
-                <span>SHA-256 документа</span>
-                <strong>{shortenHash(found.hash, 18, 12)}</strong>
-              </div>
-              <div className="blockchain-box__row">
-                <span>IPFS CID</span>
-                <strong>{found.ipfsCid ?? "не загружен"}</strong>
-              </div>
-              <div className="blockchain-box__row">
-                <span>Транзакция Polygon Amoy</span>
-                <strong>{shortenHash(found.blockchain, 14, 10)}</strong>
-              </div>
-              <div className="blockchain-box__row">
-                <span>Файл</span>
-                <strong>
-                  {found.fileName ?? "не указан"} ·{" "}
-                  {formatFileSize(found.fileSize)}
-                </strong>
-              </div>
-            </div>
+            <CertificateEvidence certificate={found} mode="full" />
           </div>
         ) : (
           <div className="empty-state">

@@ -6,6 +6,7 @@ types/ethers-contracts
 server/generated
 src/generated
 server/sms-outbox
+server/email-outbox
 .git
 .env
 *.log

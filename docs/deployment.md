@@ -14,7 +14,7 @@
 ```bash
 git clone https://github.com/Famay/borgoy-frontend.git
 cd borgoy-frontend
-cp .env.production.example .env
+cp .env.example .env
 ```
 
 Для production compose файл окружения должен называться `.env`.
@@ -24,15 +24,17 @@ cp .env.production.example .env
 - `POSTGRES_PASSWORD` - пароль базы данных;
 - `JWT_SECRET` - длинный случайный секрет;
 - `PUBLIC_APP_URL` и `CLIENT_ORIGIN` - боевой адрес сайта, например `https://example.com`;
+- `DOCKER_CLIENT_ORIGIN` и `DOCKER_PUBLIC_APP_URL` - боевой адрес сайта для Docker, например `https://example.com`;
 - `SERVER_NAME` - домены для Nginx, например `example.com www.example.com`;
 - `CERTBOT_DOMAIN` - основной домен сертификата, например `example.com`;
 - `LETSENCRYPT_EMAIL` - email для Let's Encrypt;
+- `TWO_FACTOR_EMAIL_PROVIDER`, `RESEND_API_KEY`, `EMAIL_FROM` - отправка кодов входа на email;
 - `PINATA_JWT`, `PINATA_GATEWAY`, `POLYGON_AMOY_RPC_URL`, `POLYGON_PRIVATE_KEY`, `CERTIFICATE_CONTRACT_ADDRESS` - если нужен реальный IPFS и Polygon Amoy без демонстрационного режима.
 
 На первом запуске оставить:
 
 ```text
-NGINX_TEMPLATE="./nginx/templates/http.conf.template"
+NGINX_TEMPLATE=./nginx/templates/http.conf.template
 ```
 
 ## 2. Запустить HTTP-контур
@@ -79,7 +81,7 @@ docker compose -f docker-compose.prod.yml --profile certbot run --rm certbot cer
 После успешного выпуска сертификата поменять в `.env`:
 
 ```text
-NGINX_TEMPLATE="./nginx/templates/ssl.conf.template"
+NGINX_TEMPLATE=./nginx/templates/ssl.conf.template
 ```
 
 И пересоздать контейнер фронтенда:

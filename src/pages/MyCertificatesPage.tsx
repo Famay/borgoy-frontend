@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../app/AuthContext";
+import CertificateEvidence from "../components/certificates/CertificateEvidence";
+import CertificateQr from "../components/certificates/CertificateQr";
 import StatusBadge from "../components/ui/StatusBadge";
 import { getCertificatesRequest } from "../services/api";
 import type { Certificate } from "../types/certificate";
@@ -134,14 +136,11 @@ export default function MyCertificatesPage() {
                 </div>
               </div>
 
+              <CertificateEvidence certificate={certificate} />
+
               {certificate.publicUrl && (
                 <div className="registry-card__footer">
-                  {certificate.qrCodeDataUrl && (
-                    <img
-                      src={certificate.qrCodeDataUrl}
-                      alt={`QR-код для ${certificate.id}`}
-                    />
-                  )}
+                  <CertificateQr certificate={certificate} />
                   <a className="public-link" href={certificate.publicUrl}>
                     Открыть публичную проверку
                   </a>

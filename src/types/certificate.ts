@@ -30,6 +30,9 @@ export interface Certificate {
   fileName?: string;
   fileSize?: number;
   ipfsCid?: string;
+  ipfsUrl?: string;
+  blockchainContract?: string;
+  blockchainBlockNumber?: number;
   qrToken?: string;
   qrPayload?: string;
   qrCodeDataUrl?: string;

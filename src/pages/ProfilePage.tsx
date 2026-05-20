@@ -117,7 +117,7 @@ export default function ProfilePage() {
           <div className="detail-card">
             <div className="detail-card__label">Двухфакторный вход</div>
             <div className="detail-card__value">
-              {isTwoFactorEnabled ? "Включен по SMS" : "Отключен"}
+              {isTwoFactorEnabled ? "Включен по email" : "Отключен"}
             </div>
           </div>
         </div>
