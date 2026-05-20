@@ -20,6 +20,7 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
   const passwordHash = await bcrypt.hash("supplier123", 12);
   const adminPasswordHash = await bcrypt.hash("admin123", 12);
+  const adminEmail = "voroninandrey2005@gmail.com";
 
   const supplier = await prisma.user.upsert({
     where: { email: "supplier@vermeat.ru" },
@@ -39,19 +40,30 @@ async function main() {
     },
   });
 
+  const adminWithNewEmail = await prisma.user.findUnique({
+    where: { email: adminEmail },
+  });
+
+  if (!adminWithNewEmail) {
+    await prisma.user.updateMany({
+      where: { email: "admin@vermeat.ru" },
+      data: { email: adminEmail },
+    });
+  }
+
   await prisma.user.upsert({
-    where: { email: "admin@vermeat.ru" },
+    where: { email: adminEmail },
     update: {
       phone: "+7 (999) 765-43-21",
-      twoFactorEnabled: true,
+      twoFactorEnabled: false,
     },
     create: {
       name: "Администратор VerMeat",
-      email: "admin@vermeat.ru",
+      email: adminEmail,
       phone: "+7 (999) 765-43-21",
       passwordHash: adminPasswordHash,
       role: UserRole.ADMIN,
-      twoFactorEnabled: true,
+      twoFactorEnabled: false,
     },
   });
 

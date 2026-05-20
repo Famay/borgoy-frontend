@@ -107,7 +107,7 @@ docker compose -f docker-compose.prod.yml exec api npx prisma db seed
 Демо-аккаунты:
 
 - поставщик: `supplier@vermeat.ru` / `supplier123`;
-- администратор: `admin@vermeat.ru` / `admin123`.
+- администратор: `voroninandrey2005@gmail.com` / `admin123`.
 
 Для боевого запуска пароли демо-аккаунтов нужно заменить или не загружать начальные данные.
 

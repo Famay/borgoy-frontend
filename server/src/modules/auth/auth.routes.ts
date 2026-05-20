@@ -83,6 +83,13 @@ function assertUserCanLogin(user: { status: UserStatus }) {
   }
 }
 
+function shouldRequireTwoFactor(user: {
+  role: UserRole;
+  twoFactorEnabled: boolean;
+}) {
+  return user.role === UserRole.SUPPLIER && user.twoFactorEnabled;
+}
+
 async function writeLoginAudit(userId: string, twoFactorUsed: boolean) {
   await prisma.auditLog.create({
     data: {
@@ -236,7 +243,7 @@ authRouter.post(
 
     assertUserCanLogin(user);
 
-    if (user.twoFactorEnabled) {
+    if (shouldRequireTwoFactor(user)) {
       const challenge = await issueTwoFactorCode(user);
 
       res.json({
