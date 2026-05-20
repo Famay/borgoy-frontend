@@ -28,7 +28,7 @@ cp .env.example .env
 - `SERVER_NAME` - домены для Nginx, например `example.com www.example.com`;
 - `CERTBOT_DOMAIN` - основной домен сертификата, например `example.com`;
 - `LETSENCRYPT_EMAIL` - email для Let's Encrypt;
-- `TWO_FACTOR_EMAIL_PROVIDER`, `RESEND_API_KEY`, `EMAIL_FROM` - отправка кодов входа на email;
+- `TWO_FACTOR_EMAIL_PROVIDER`, `EMAIL_FROM`, `SMTP_*` или `RESEND_API_KEY` - отправка кодов входа на email;
 - `PINATA_JWT`, `PINATA_GATEWAY`, `POLYGON_AMOY_RPC_URL`, `POLYGON_PRIVATE_KEY`, `CERTIFICATE_CONTRACT_ADDRESS` - если нужен реальный IPFS и Polygon Amoy без демонстрационного режима.
 
 На первом запуске оставить:

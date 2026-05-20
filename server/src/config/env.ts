@@ -1,6 +1,11 @@
 import "dotenv/config";
 import { z } from "zod";
 
+const booleanString = z
+  .enum(["true", "false"])
+  .default("false")
+  .transform((value) => value === "true");
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
@@ -16,9 +21,14 @@ const envSchema = z.object({
   POLYGON_AMOY_RPC_URL: z.string().optional(),
   POLYGON_PRIVATE_KEY: z.string().optional(),
   CERTIFICATE_CONTRACT_ADDRESS: z.string().optional(),
-  TWO_FACTOR_EMAIL_PROVIDER: z.enum(["file", "resend"]).default("file"),
+  TWO_FACTOR_EMAIL_PROVIDER: z.enum(["file", "resend", "smtp"]).default("file"),
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().optional(),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_SECURE: booleanString,
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);

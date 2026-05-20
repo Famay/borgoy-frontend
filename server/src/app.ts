@@ -56,6 +56,26 @@ function isAllowedCorsOrigin(origin: string | undefined) {
   return !origin || getAllowedOrigins().has(origin);
 }
 
+function isJsonParseError(
+  error: unknown
+): error is SyntaxError & { status?: number; statusCode?: number; type?: string } {
+  if (!(error instanceof SyntaxError)) {
+    return false;
+  }
+
+  const parseError = error as SyntaxError & {
+    status?: number;
+    statusCode?: number;
+    type?: string;
+  };
+
+  return (
+    parseError.type === "entity.parse.failed" ||
+    parseError.status === 400 ||
+    parseError.statusCode === 400
+  );
+}
+
 function getUniqueConstraintMessage(error: Prisma.PrismaClientKnownRequestError) {
   const target = Array.isArray(error.meta?.target)
     ? error.meta.target.join(",")
@@ -128,6 +148,11 @@ export function createApp() {
       _next: express.NextFunction
     ) => {
       void _next;
+
+      if (isJsonParseError(error)) {
+        res.status(400).json({ message: "Некорректный JSON в теле запроса" });
+        return;
+      }
 
       if (error instanceof ZodError) {
         res.status(400).json({

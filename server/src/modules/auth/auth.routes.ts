@@ -115,10 +115,15 @@ async function issueTwoFactorCode(user: {
     },
   });
 
-  await sendTwoFactorEmail({
-    email: user.email,
-    code,
-  });
+  try {
+    await sendTwoFactorEmail({
+      email: user.email,
+      code,
+    });
+  } catch (error) {
+    console.error(error);
+    throw new HttpError(502, "Не удалось отправить код подтверждения на email");
+  }
 
   return {
     challengeToken: signTwoFactorChallengeToken(user.id),
