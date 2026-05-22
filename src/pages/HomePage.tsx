@@ -1,12 +1,41 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import heroImage from "../assets/baran.jpg";
-import { useCertificates } from "../app/CertificatesContext";
-import { getCertificateStats } from "../utils/certificates";
+import heroImage from "../assets/123.jpg";
+import {
+  getPublicStatsRequest,
+  type PublicCertificateStats,
+} from "../services/api";
+
+const emptyStats: PublicCertificateStats = {
+  certificatesTotal: 0,
+  certificatesConfirmed: 0,
+  certificatesPending: 0,
+  certificatesWithProblems: 0,
+};
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { certificates } = useCertificates();
-  const stats = getCertificateStats(certificates);
+  const [stats, setStats] = useState<PublicCertificateStats>(emptyStats);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getPublicStatsRequest()
+      .then((nextStats) => {
+        if (isMounted) {
+          setStats(nextStats);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setStats(emptyStats);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <section className="page">
@@ -50,19 +79,21 @@ export default function HomePage() {
       <div className="stats">
         <div className="card stat-card">
           <div className="stat-card__label">Всего сертификатов</div>
-          <div className="stat-card__value">{stats.total}</div>
+          <div className="stat-card__value">{stats.certificatesTotal}</div>
         </div>
         <div className="card stat-card">
           <div className="stat-card__label">Подтверждено</div>
-          <div className="stat-card__value">{stats.confirmed}</div>
+          <div className="stat-card__value">{stats.certificatesConfirmed}</div>
         </div>
         <div className="card stat-card">
           <div className="stat-card__label">На проверке</div>
-          <div className="stat-card__value">{stats.checking}</div>
+          <div className="stat-card__value">{stats.certificatesPending}</div>
         </div>
         <div className="card stat-card">
           <div className="stat-card__label">С расхождениями</div>
-          <div className="stat-card__value">{stats.issues}</div>
+          <div className="stat-card__value">
+            {stats.certificatesWithProblems}
+          </div>
         </div>
       </div>
 

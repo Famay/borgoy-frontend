@@ -27,6 +27,7 @@ enum CertificateStatus {
 
 enum AuditAction {
   USER_REGISTERED
+  USER_STATUS_UPDATED
   USER_LOGIN
   USER_LOGIN_2FA_FAILED
   TWO_FACTOR_ENABLED

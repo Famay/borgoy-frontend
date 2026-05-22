@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../app/AuthContext";
 import { useCertificates } from "../app/CertificatesContext";
 import CertificateEvidence from "../components/certificates/CertificateEvidence";
@@ -31,6 +32,7 @@ function createDefaultCertificateNo() {
 export default function SupplierPage() {
   const { addCertificate } = useCertificates();
   const { token, user } = useAuth();
+  const navigate = useNavigate();
 
   const [form, setForm] = useState<SupplierForm>({
     supplier: user?.companyName ?? "ООО «Боргойский продукт»",
@@ -300,6 +302,27 @@ export default function SupplierPage() {
 
         {lastCertificate && (
           <div className="success-panel">
+            <div className="upload-result">
+              <div>
+                <div className="upload-result__label">Сертификат создан</div>
+                <div className="upload-result__title">{lastCertificate.id}</div>
+                <div className="upload-result__text">
+                  Партия {lastCertificate.batchNumber} добавлена в реестр.
+                </div>
+              </div>
+
+              <div className="upload-result__meta">
+                <div>
+                  <span>IPFS CID</span>
+                  <strong>{lastCertificate.ipfsCid ?? "не загружен"}</strong>
+                </div>
+                <div>
+                  <span>Polygon tx</span>
+                  <strong>{shortenHash(lastCertificate.blockchain, 16, 10)}</strong>
+                </div>
+              </div>
+            </div>
+
             <div className="qr-preview">
               <CertificateQr certificate={lastCertificate} />
               <div>
@@ -311,6 +334,21 @@ export default function SupplierPage() {
                 </a>
               </div>
             </div>
+
+            <div className="actions-row">
+              {lastCertificate.publicUrl && (
+                <a className="button button--primary" href={lastCertificate.publicUrl}>
+                  Открыть публичную проверку
+                </a>
+              )}
+              <button
+                className="button button--secondary"
+                onClick={() => navigate("/my-certificates")}
+              >
+                Перейти в мои сертификаты
+              </button>
+            </div>
+
             <CertificateEvidence certificate={lastCertificate} />
           </div>
         )}

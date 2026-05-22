@@ -76,14 +76,6 @@ export default function ProfilePage() {
               Данные текущей учетной записи и рабочие действия в системе.
             </p>
           </div>
-          {isAdmin && (
-            <button
-              className="button button--primary"
-              onClick={() => navigate("/admin/logs")}
-            >
-              Журнал аудита
-            </button>
-          )}
         </div>
 
         <div className="details-grid">

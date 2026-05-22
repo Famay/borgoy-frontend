@@ -104,6 +104,75 @@ interface AdminOverviewResponse {
   recentLogs: ApiAuditLog[];
 }
 
+interface ApiFailedVerification {
+  id: string;
+  query: string;
+  isValid: boolean;
+  message: string;
+  createdAt: string;
+  certificate?: {
+    id: string;
+    certificateNo: string;
+  } | null;
+  batch?: {
+    id: string;
+    batchNumber: string;
+    productName: string;
+  } | null;
+}
+
+interface AdminDashboardResponse {
+  overview: AdminOverview;
+  recentSuppliers: ApiAdminSupplier[];
+  pendingCertificates: ApiCertificate[];
+  problemCertificates: ApiCertificate[];
+  failedVerifications: ApiFailedVerification[];
+}
+
+type ApiUserStatus = "ACTIVE" | "PENDING" | "BLOCKED";
+
+interface ApiAdminSupplier {
+  id: string;
+  name: string;
+  companyName?: string | null;
+  email: string;
+  phone?: string | null;
+  inn?: string | null;
+  status: ApiUserStatus;
+  twoFactorEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  batchesTotal: number;
+  certificatesTotal: number;
+  recentBatch?: {
+    id: string;
+    batchNumber: string;
+    productName: string;
+    createdAt: string;
+  } | null;
+}
+
+type ApiServiceStatus = "ok" | "warning" | "error";
+
+interface ApiAdminSystemStatus {
+  generatedAt: string;
+  services: Record<
+    "database" | "email" | "ipfs" | "blockchain" | "app",
+    {
+      status: ApiServiceStatus;
+      details: string;
+    }
+  >;
+  counts: {
+    usersTotal: number;
+    suppliersTotal: number;
+    batchesTotal: number;
+    certificatesTotal: number;
+    pendingCertificates: number;
+    failedVerificationChecks: number;
+  };
+}
+
 interface PublicVerifyResponse {
   isValid: boolean;
   message: string;
@@ -159,6 +228,63 @@ export interface AdminOverview {
   failedVerificationChecks: number;
 }
 
+export interface AdminFailedVerification {
+  id: string;
+  query: string;
+  message: string;
+  createdAt: string;
+  certificate?: {
+    id: string;
+    certificateNo: string;
+  } | null;
+  batch?: {
+    id: string;
+    batchNumber: string;
+    productName: string;
+  } | null;
+}
+
+export interface AdminDashboard {
+  overview: AdminOverview;
+  recentSuppliers: AdminSupplier[];
+  pendingCertificates: Certificate[];
+  problemCertificates: Certificate[];
+  failedVerifications: AdminFailedVerification[];
+}
+
+export type AdminSupplierStatus = ApiUserStatus;
+
+export interface AdminSupplier {
+  id: string;
+  name: string;
+  companyName?: string | null;
+  email: string;
+  phone?: string | null;
+  inn?: string | null;
+  status: AdminSupplierStatus;
+  twoFactorEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  batchesTotal: number;
+  certificatesTotal: number;
+  recentBatch?: {
+    id: string;
+    batchNumber: string;
+    productName: string;
+    createdAt: string;
+  } | null;
+}
+
+export type AdminServiceStatus = ApiServiceStatus;
+export type AdminSystemStatus = ApiAdminSystemStatus;
+
+export interface PublicCertificateStats {
+  certificatesTotal: number;
+  certificatesConfirmed: number;
+  certificatesPending: number;
+  certificatesWithProblems: number;
+}
+
 export interface AuditLogEntry {
   id: string;
   action: string;
@@ -182,6 +308,7 @@ function mapRole(role: ApiRole): UserRole {
 function mapAuditAction(action: string) {
   const labels: Record<string, string> = {
     USER_REGISTERED: "Регистрация пользователя",
+    USER_STATUS_UPDATED: "Изменение статуса поставщика",
     USER_LOGIN: "Вход в систему",
     USER_LOGIN_2FA_FAILED: "Ошибка второго фактора",
     TWO_FACTOR_ENABLED: "Двухфакторный вход включен",
@@ -258,6 +385,37 @@ function mapUser(user: ApiUser): AuthUser {
     companyName: user.companyName,
     status: user.status,
     twoFactorEnabled: user.twoFactorEnabled,
+  };
+}
+
+function mapAdminSupplier(supplier: ApiAdminSupplier): AdminSupplier {
+  return {
+    id: supplier.id,
+    name: supplier.name,
+    companyName: supplier.companyName,
+    email: supplier.email,
+    phone: supplier.phone,
+    inn: supplier.inn,
+    status: supplier.status,
+    twoFactorEnabled: supplier.twoFactorEnabled,
+    createdAt: supplier.createdAt,
+    updatedAt: supplier.updatedAt,
+    batchesTotal: supplier.batchesTotal,
+    certificatesTotal: supplier.certificatesTotal,
+    recentBatch: supplier.recentBatch,
+  };
+}
+
+function mapFailedVerification(
+  verification: ApiFailedVerification
+): AdminFailedVerification {
+  return {
+    id: verification.id,
+    query: verification.query,
+    message: verification.message,
+    createdAt: verification.createdAt,
+    certificate: verification.certificate,
+    batch: verification.batch,
   };
 }
 
@@ -357,6 +515,10 @@ function isTwoFactorChallengeResponse(
   return "twoFactorRequired" in response && response.twoFactorRequired;
 }
 
+export async function getPublicStatsRequest() {
+  return request<PublicCertificateStats>("/public/stats");
+}
+
 export async function loginRequest(
   email: string,
   password: string
@@ -440,6 +602,50 @@ export async function getAdminOverviewRequest(token: string) {
     overview: response.overview,
     recentLogs: response.recentLogs.map(mapAuditLog),
   };
+}
+
+export async function getAdminDashboardRequest(token: string) {
+  const response = await request<AdminDashboardResponse>("/admin/dashboard", {
+    token,
+  });
+
+  return {
+    overview: response.overview,
+    recentSuppliers: response.recentSuppliers.map(mapAdminSupplier),
+    pendingCertificates: response.pendingCertificates.map(mapCertificate),
+    problemCertificates: response.problemCertificates.map(mapCertificate),
+    failedVerifications: response.failedVerifications.map(mapFailedVerification),
+  };
+}
+
+export async function getAdminSuppliersRequest(token: string) {
+  const response = await request<{ suppliers: ApiAdminSupplier[] }>(
+    "/admin/suppliers",
+    { token }
+  );
+
+  return response.suppliers.map(mapAdminSupplier);
+}
+
+export async function updateSupplierStatusRequest(
+  supplierId: string,
+  status: AdminSupplierStatus,
+  token: string
+) {
+  const response = await request<{ supplier: ApiAdminSupplier }>(
+    `/admin/suppliers/${encodeURIComponent(supplierId)}/status`,
+    {
+      method: "PATCH",
+      token,
+      body: JSON.stringify({ status }),
+    }
+  );
+
+  return mapAdminSupplier(response.supplier);
+}
+
+export async function getAdminSystemStatusRequest(token: string) {
+  return request<AdminSystemStatus>("/admin/status", { token });
 }
 
 export async function getAuditLogsRequest(token: string, limit = 80) {

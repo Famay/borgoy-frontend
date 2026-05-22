@@ -16,6 +16,43 @@ const verifyQuerySchema = z.object({
 export const publicRouter = Router();
 
 publicRouter.get(
+  "/stats",
+  asyncHandler(async (_req, res) => {
+    const [
+      certificatesTotal,
+      certificatesConfirmed,
+      certificatesPending,
+      certificatesWithProblems,
+    ] = await Promise.all([
+      prisma.certificate.count(),
+      prisma.certificate.count({
+        where: { status: CertificateStatus.CONFIRMED },
+      }),
+      prisma.certificate.count({
+        where: { status: CertificateStatus.PENDING },
+      }),
+      prisma.certificate.count({
+        where: {
+          status: {
+            in: [
+              CertificateStatus.MISMATCH,
+              CertificateStatus.BLOCKCHAIN_FAILED,
+            ],
+          },
+        },
+      }),
+    ]);
+
+    res.json({
+      certificatesTotal,
+      certificatesConfirmed,
+      certificatesPending,
+      certificatesWithProblems,
+    });
+  })
+);
+
+publicRouter.get(
   "/verify/:token",
   asyncHandler(async (req, res) => {
     const token = getRouteParam(req.params.token, "token");

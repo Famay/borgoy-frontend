@@ -146,7 +146,7 @@ certificatesRouter.get(
 certificatesRouter.post(
   "/batches/:batchId/certificates",
   requireAuth,
-  requireRole(UserRole.SUPPLIER, UserRole.ADMIN),
+  requireRole(UserRole.SUPPLIER),
   upload.single("file"),
   asyncHandler(async (req, res) => {
     const user = req.user;
@@ -170,7 +170,7 @@ certificatesRouter.post(
       throw new HttpError(404, "Партия не найдена");
     }
 
-    if (user.role !== UserRole.ADMIN && batch.supplierId !== user.id) {
+    if (batch.supplierId !== user.id) {
       throw new HttpError(403, "Недостаточно прав");
     }
 

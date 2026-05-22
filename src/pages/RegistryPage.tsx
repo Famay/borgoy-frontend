@@ -19,6 +19,9 @@ const statusOptions: CertificateStatus[] = [
   "Ошибка blockchain",
 ];
 
+const allStatuses = "all";
+type StatusFilter = typeof allStatuses | CertificateStatus;
+
 export default function RegistryPage() {
   const { token } = useAuth();
   const { certificates: localCertificates } = useCertificates();
@@ -27,6 +30,10 @@ export default function RegistryPage() {
   const [processingId, setProcessingId] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(allStatuses);
+  const [supplierFilter, setSupplierFilter] = useState("all");
+  const [onlyProblematic, setOnlyProblematic] = useState(false);
 
   const loadCertificates = useCallback(async () => {
     if (!token) {
@@ -66,6 +73,47 @@ export default function RegistryPage() {
 
     return localCertificates;
   }, [apiCertificates, localCertificates]);
+
+  const suppliers = useMemo(() => {
+    return Array.from(
+      new Set(certificates.map((certificate) => certificate.supplier))
+    ).sort((first, second) => first.localeCompare(second, "ru"));
+  }, [certificates]);
+
+  const filteredCertificates = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    return certificates.filter((certificate) => {
+      const isProblem =
+        certificate.status !== statusOptions[0] &&
+        certificate.status !== statusOptions[1];
+      const matchesQuery =
+        !normalizedQuery ||
+        [
+          certificate.id,
+          certificate.batchNumber,
+          certificate.product,
+          certificate.supplier,
+          certificate.documentNumber,
+          certificate.hash,
+          certificate.ipfsCid,
+          certificate.blockchain,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(normalizedQuery);
+      const matchesStatus =
+        statusFilter === allStatuses || certificate.status === statusFilter;
+      const matchesSupplier =
+        supplierFilter === "all" || certificate.supplier === supplierFilter;
+      const matchesProblem = !onlyProblematic || isProblem;
+
+      return (
+        matchesQuery && matchesStatus && matchesSupplier && matchesProblem
+      );
+    });
+  }, [certificates, onlyProblematic, query, statusFilter, supplierFilter]);
 
   const handleStatusChange = async (
     certificate: Certificate,
@@ -166,8 +214,56 @@ export default function RegistryPage() {
       )}
 
       <div className="card">
+        <div className="registry-filters">
+          <input
+            className="search-input"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Поиск по сертификату, партии, поставщику или hash"
+          />
+
+          <select
+            value={statusFilter}
+            onChange={(event) =>
+              setStatusFilter(event.target.value as StatusFilter)
+            }
+          >
+            <option value={allStatuses}>Все статусы</option>
+            {statusOptions.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={supplierFilter}
+            onChange={(event) => setSupplierFilter(event.target.value)}
+          >
+            <option value="all">Все поставщики</option>
+            {suppliers.map((supplier) => (
+              <option key={supplier} value={supplier}>
+                {supplier}
+              </option>
+            ))}
+          </select>
+
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={onlyProblematic}
+              onChange={(event) => setOnlyProblematic(event.target.checked)}
+            />
+            <span>Только проблемные</span>
+          </label>
+        </div>
+
+        <div className="registry-filter-summary">
+          Показано {filteredCertificates.length} из {certificates.length}
+        </div>
+
         <div className="details-grid registry-grid">
-          {certificates.map((certificate) => (
+          {filteredCertificates.map((certificate) => (
             <article key={certificate.id} className="detail-card registry-card">
               <div className="verify-result__header">
                 <div>
@@ -256,7 +352,7 @@ export default function RegistryPage() {
             </article>
           ))}
 
-          {!isLoading && certificates.length === 0 && (
+          {!isLoading && filteredCertificates.length === 0 && (
             <div className="empty-state">В реестре пока нет сертификатов.</div>
           )}
         </div>

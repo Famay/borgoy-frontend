@@ -57,7 +57,7 @@ batchesRouter.get(
 batchesRouter.post(
   "/",
   requireAuth,
-  requireRole(UserRole.SUPPLIER, UserRole.ADMIN),
+  requireRole(UserRole.SUPPLIER),
   asyncHandler(async (req, res) => {
     const user = req.user;
 

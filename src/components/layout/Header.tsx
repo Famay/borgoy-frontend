@@ -3,10 +3,14 @@ import { useAuth } from "../../app/AuthContext";
 
 const titles: Record<string, string> = {
   "/": "VerMeat - система верификации продукции",
+  "/about": "О проекте",
   "/supplier": "Кабинет поставщика",
   "/registry": "Реестр сертификатов",
   "/verify": "Проверка подлинности",
   "/profile": "Профиль пользователя",
+  "/admin": "Dashboard администратора",
+  "/admin/suppliers": "Поставщики",
+  "/admin/status": "Состояние системы",
   "/admin/logs": "Журнал аудита",
   "/login": "Вход в систему",
   "/register": "Регистрация поставщика",

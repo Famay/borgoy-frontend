@@ -11,7 +11,11 @@ import ProfilePage from "../pages/ProfilePage";
 import MyCertificatesPage from "../pages/MyCertificatesPage";
 import LoginPage from "../pages/LoginPage";
 import RegisterPage from "../pages/RegisterPage";
+import AboutPage from "../pages/AboutPage";
 import AdminLogsPage from "../pages/AdminLogsPage";
+import AdminSuppliersPage from "../pages/AdminSuppliersPage";
+import AdminStatusPage from "../pages/AdminStatusPage";
+import AdminDashboardPage from "../pages/AdminDashboardPage";
 
 export default function App() {
   return (
@@ -21,6 +25,7 @@ export default function App() {
           <Routes>
             <Route element={<AppLayout />}>
               <Route path="/" element={<HomePage />} />
+              <Route path="/about" element={<AboutPage />} />
               <Route path="/verify" element={<VerifyPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
@@ -28,7 +33,7 @@ export default function App() {
               <Route
                 path="/supplier"
                 element={
-                  <ProtectedRoute allowedRoles={["supplier", "admin"]}>
+                  <ProtectedRoute allowedRoles={["supplier"]}>
                     <SupplierPage />
                   </ProtectedRoute>
                 }
@@ -62,10 +67,37 @@ export default function App() {
               />
 
               <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminDashboardPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
                 path="/admin/logs"
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
                     <AdminLogsPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/admin/suppliers"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminSuppliersPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/admin/status"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminStatusPage />
                   </ProtectedRoute>
                 }
               />
