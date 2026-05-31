@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../app/AuthContext";
 import CertificateEvidence from "../components/certificates/CertificateEvidence";
+import CertificateHistory from "../components/certificates/CertificateHistory";
 import CertificateQr from "../components/certificates/CertificateQr";
 import StatusBadge from "../components/ui/StatusBadge";
 import { getCertificatesRequest } from "../services/api";
@@ -134,9 +135,22 @@ export default function MyCertificatesPage() {
                   <span>Транзакция</span>
                   <strong>{shortenHash(certificate.blockchain, 14, 8)}</strong>
                 </div>
+                {certificate.cancellationReason && (
+                  <div>
+                    <span>Причина аннулирования</span>
+                    <strong>{certificate.cancellationReason}</strong>
+                  </div>
+                )}
+                {certificate.cancelledAt && (
+                  <div>
+                    <span>Дата аннулирования</span>
+                    <strong>{certificate.cancelledAt.slice(0, 10)}</strong>
+                  </div>
+                )}
               </div>
 
               <CertificateEvidence certificate={certificate} />
+              <CertificateHistory history={certificate.history} />
 
               {certificate.publicUrl && (
                 <div className="registry-card__footer">

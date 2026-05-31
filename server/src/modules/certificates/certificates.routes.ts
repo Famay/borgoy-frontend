@@ -3,6 +3,7 @@ import { Router } from "express";
 import { z } from "zod";
 import {
   AuditAction,
+  CertificateHistoryAction,
   CertificateStatus,
   UserRole,
 } from "../../../generated/prisma/enums";
@@ -16,10 +17,30 @@ import { HttpError } from "../../utils/httpError";
 import { createPublicVerifyUrl, createQrCodeDataUrl } from "../../utils/qr";
 import { getRouteParam } from "../../utils/request";
 
+const MAX_CERTIFICATE_FILE_SIZE = 10 * 1024 * 1024;
+const allowedCertificateMimeTypes = new Set([
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+]);
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024,
+    fileSize: MAX_CERTIFICATE_FILE_SIZE,
+  },
+  fileFilter: (_req, file, callback) => {
+    if (!allowedCertificateMimeTypes.has(file.mimetype)) {
+      callback(
+        new HttpError(
+          415,
+          "Поддерживаются только сертификаты в формате PDF, PNG или JPEG"
+        )
+      );
+      return;
+    }
+
+    callback(null, true);
   },
 });
 
@@ -66,6 +87,18 @@ certificatesRouter.get(
           },
         },
         blockchainTransaction: true,
+        history: {
+          include: {
+            changedBy: {
+              select: {
+                id: true,
+                name: true,
+                role: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -118,6 +151,20 @@ certificatesRouter.get(
     const certificateId = getRouteParam(req.params.id, "id");
     const certificate = await prisma.certificate.findUnique({
       where: { id: certificateId },
+      include: {
+        history: {
+          include: {
+            changedBy: {
+              select: {
+                id: true,
+                name: true,
+                role: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        },
+      },
     });
 
     if (!certificate) {
@@ -235,6 +282,14 @@ certificatesRouter.post(
             contract: blockchainRegistration.contract,
           },
         },
+        history: {
+          create: {
+            action: CertificateHistoryAction.CREATED,
+            nextStatus: CertificateStatus.CONFIRMED,
+            message: `Сертификат ${certificateNo} загружен поставщиком`,
+            changedById: user.id,
+          },
+        },
       },
       include: {
         batch: {
@@ -249,6 +304,18 @@ certificatesRouter.post(
           },
         },
         blockchainTransaction: true,
+        history: {
+          include: {
+            changedBy: {
+              select: {
+                id: true,
+                name: true,
+                role: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
 

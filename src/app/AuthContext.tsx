@@ -1,6 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import {
+  ApiRequestError,
+  getCurrentUserRequest,
   loginRequest,
   registerRequest,
   verifyTwoFactorLoginRequest,
@@ -54,7 +56,20 @@ function readStoredSession() {
   }
 
   try {
-    return JSON.parse(storedSession) as AuthSession;
+    const parsed = JSON.parse(storedSession) as Partial<AuthSession>;
+
+    if (
+      typeof parsed.token !== "string" ||
+      !parsed.user ||
+      typeof parsed.user.id !== "string" ||
+      typeof parsed.user.name !== "string" ||
+      typeof parsed.user.email !== "string" ||
+      (parsed.user.role !== "supplier" && parsed.user.role !== "admin")
+    ) {
+      throw new Error("Invalid stored session");
+    }
+
+    return parsed as AuthSession;
   } catch {
     localStorage.removeItem(AUTH_STORAGE_KEY);
     return null;
@@ -70,6 +85,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(nextSession);
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextSession));
   };
+  const sessionToken = session?.token;
+
+  useEffect(() => {
+    if (!sessionToken) {
+      return;
+    }
+
+    let isActive = true;
+
+    getCurrentUserRequest(sessionToken)
+      .then((user) => {
+        if (!isActive) {
+          return;
+        }
+
+        setSession((currentSession) => {
+          if (!currentSession || currentSession.token !== sessionToken) {
+            return currentSession;
+          }
+
+          const nextSession = { ...currentSession, user };
+          localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextSession));
+          return nextSession;
+        });
+      })
+      .catch((error: unknown) => {
+        if (
+          isActive &&
+          error instanceof ApiRequestError &&
+          (error.statusCode === 401 || error.statusCode === 403)
+        ) {
+          setSession(null);
+          localStorage.removeItem(AUTH_STORAGE_KEY);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [sessionToken]);
 
   const value = useMemo(
     () => ({
@@ -124,10 +179,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       register: async (payload: RegisterPayload) => {
         try {
-          const nextSession = await registerRequest(payload);
-          persistSession(nextSession);
+          const result = await registerRequest(payload);
 
-          return { success: true, user: nextSession.user };
+          return { success: true, user: result.user };
         } catch (error) {
           return {
             success: false,

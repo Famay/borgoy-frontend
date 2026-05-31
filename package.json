@@ -16,6 +16,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
+    "test:api": "tsx server/test/run-integration-tests.ts",
     "hardhat:compile": "hardhat compile",
     "hardhat:test": "hardhat test",
     "hardhat:deploy:amoy": "hardhat ignition deploy --network polygonAmoy ignition/modules/CertificateRegistry.ts"

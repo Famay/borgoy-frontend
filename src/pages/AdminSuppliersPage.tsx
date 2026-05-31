@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { useAuth } from "../app/AuthContext";
 import {
   getAdminSuppliersRequest,
   getAdminSystemStatusRequest,
   updateSupplierStatusRequest,
   type AdminSupplier,
+  type AdminSupplierFilters,
   type AdminSupplierStatus,
+  type AdminSupplierSummary,
+  type ListPagination,
 } from "../services/api";
 
 const statusOptions: AdminSupplierStatus[] = ["ACTIVE", "PENDING", "BLOCKED"];
@@ -14,6 +17,27 @@ const statusLabels: Record<AdminSupplierStatus, string> = {
   ACTIVE: "Активен",
   PENDING: "Ожидает",
   BLOCKED: "Заблокирован",
+};
+
+const defaultFilters: AdminSupplierFilters = {
+  page: 1,
+  pageSize: 10,
+  query: "",
+  status: "",
+};
+
+const defaultPagination: ListPagination = {
+  page: 1,
+  pageSize: 10,
+  total: 0,
+  totalPages: 0,
+};
+
+const defaultSummary: AdminSupplierSummary = {
+  suppliersTotal: 0,
+  activeSuppliers: 0,
+  blockedSuppliers: 0,
+  supplierCertificatesTotal: 0,
 };
 
 function formatDate(value: string) {
@@ -37,7 +61,13 @@ function getStatusClass(status: AdminSupplierStatus) {
 export default function AdminSuppliersPage() {
   const { token } = useAuth();
   const [suppliers, setSuppliers] = useState<AdminSupplier[]>([]);
-  const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState<AdminSupplierFilters>(defaultFilters);
+  const [appliedFilters, setAppliedFilters] =
+    useState<AdminSupplierFilters>(defaultFilters);
+  const [pagination, setPagination] =
+    useState<ListPagination>(defaultPagination);
+  const [summary, setSummary] =
+    useState<AdminSupplierSummary>(defaultSummary);
   const [processingId, setProcessingId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -53,12 +83,14 @@ export default function AdminSuppliersPage() {
     setIsLoading(true);
 
     try {
-      const [nextSuppliers, systemStatus] = await Promise.all([
-        getAdminSuppliersRequest(token),
+      const [supplierResult, systemStatus] = await Promise.all([
+        getAdminSuppliersRequest(token, appliedFilters),
         getAdminSystemStatusRequest(token),
       ]);
 
-      setSuppliers(nextSuppliers);
+      setSuppliers(supplierResult.suppliers);
+      setPagination(supplierResult.pagination);
+      setSummary(supplierResult.summary);
       setRegistryCertificatesTotal(systemStatus.counts.certificatesTotal);
     } catch (loadError) {
       setError(
@@ -69,7 +101,7 @@ export default function AdminSuppliersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [appliedFilters, token]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -81,41 +113,19 @@ export default function AdminSuppliersPage() {
     };
   }, [loadSuppliers]);
 
-  const filteredSuppliers = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAppliedFilters({ ...filters, page: 1 });
+  };
 
-    if (!normalizedQuery) {
-      return suppliers;
-    }
+  const handleReset = () => {
+    setFilters(defaultFilters);
+    setAppliedFilters(defaultFilters);
+  };
 
-    return suppliers.filter((supplier) => {
-      const searchText = [
-        supplier.name,
-        supplier.companyName,
-        supplier.email,
-        supplier.inn,
-        supplier.recentBatch?.batchNumber,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return searchText.includes(normalizedQuery);
-    });
-  }, [query, suppliers]);
-
-  const totals = useMemo(
-    () => ({
-      active: suppliers.filter((supplier) => supplier.status === "ACTIVE").length,
-      blocked: suppliers.filter((supplier) => supplier.status === "BLOCKED")
-        .length,
-      supplierCertificates: suppliers.reduce(
-        (total, supplier) => total + supplier.certificatesTotal,
-        0
-      ),
-    }),
-    [suppliers]
-  );
+  const setPage = (page: number) => {
+    setAppliedFilters((current) => ({ ...current, page }));
+  };
 
   const handleStatusChange = async (
     supplier: AdminSupplier,
@@ -130,17 +140,8 @@ export default function AdminSuppliersPage() {
     setMessage("");
 
     try {
-      const updatedSupplier = await updateSupplierStatusRequest(
-        supplier.id,
-        status,
-        token
-      );
-
-      setSuppliers((current) =>
-        current.map((item) =>
-          item.id === supplier.id ? updatedSupplier : item
-        )
-      );
+      await updateSupplierStatusRequest(supplier.id, status, token);
+      await loadSuppliers();
       setMessage(
         `Статус поставщика ${supplier.email} изменен на ${statusLabels[status]}.`
       );
@@ -177,19 +178,21 @@ export default function AdminSuppliersPage() {
       <div className="stats admin-summary-grid">
         <div className="card stat-card">
           <div className="stat-card__label">Всего поставщиков</div>
-          <div className="stat-card__value">{suppliers.length}</div>
+          <div className="stat-card__value">{summary.suppliersTotal}</div>
         </div>
         <div className="card stat-card">
           <div className="stat-card__label">Активные</div>
-          <div className="stat-card__value">{totals.active}</div>
+          <div className="stat-card__value">{summary.activeSuppliers}</div>
         </div>
         <div className="card stat-card">
           <div className="stat-card__label">Заблокированные</div>
-          <div className="stat-card__value">{totals.blocked}</div>
+          <div className="stat-card__value">{summary.blockedSuppliers}</div>
         </div>
         <div className="card stat-card">
           <div className="stat-card__label">Сертификаты</div>
-          <div className="stat-card__value">{totals.supplierCertificates}</div>
+          <div className="stat-card__value">
+            {summary.supplierCertificatesTotal}
+          </div>
         </div>
         <div className="card stat-card">
           <div className="stat-card__label">Всего в реестре</div>
@@ -207,14 +210,63 @@ export default function AdminSuppliersPage() {
       {error && <div className="form-error">{error}</div>}
 
       <div className="card">
-        <div className="admin-toolbar">
+        <form className="list-filters" onSubmit={handleSubmit}>
           <input
             className="search-input"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Поиск по названию, email, ИНН или партии"
+            value={filters.query}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                query: event.target.value,
+              }))
+            }
+            placeholder="Название, email, ИНН или номер партии"
           />
-        </div>
+          <select
+            value={filters.status}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                status: event.target.value as AdminSupplierStatus | "",
+              }))
+            }
+          >
+            <option value="">Все статусы</option>
+            {statusOptions.map((status) => (
+              <option key={status} value={status}>
+                {statusLabels[status]}
+              </option>
+            ))}
+          </select>
+          <label>
+            <span>На странице</span>
+            <select
+              value={filters.pageSize}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  pageSize: Number(event.target.value),
+                }))
+              }
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+            </select>
+          </label>
+          <div className="actions-row list-filters__actions">
+            <button className="button button--primary" type="submit">
+              Применить
+            </button>
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={handleReset}
+            >
+              Сбросить
+            </button>
+          </div>
+        </form>
 
         <div className="table-wrapper">
           <table className="data-table">
@@ -229,7 +281,7 @@ export default function AdminSuppliersPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredSuppliers.map((supplier) => (
+              {suppliers.map((supplier) => (
                 <tr key={supplier.id}>
                   <td>
                     <div className="table-main">
@@ -290,13 +342,40 @@ export default function AdminSuppliersPage() {
                 </tr>
               ))}
 
-              {!isLoading && filteredSuppliers.length === 0 && (
+              {!isLoading && suppliers.length === 0 && (
                 <tr>
                   <td colSpan={6}>Поставщики не найдены.</td>
                 </tr>
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="audit-log-pagination">
+          <span>
+            Найдено поставщиков: {pagination.total}. Страница {pagination.page}{" "}
+            из {Math.max(pagination.totalPages, 1)}.
+          </span>
+          <div className="actions-row">
+            <button
+              className="button button--secondary"
+              onClick={() => setPage(pagination.page - 1)}
+              disabled={isLoading || pagination.page <= 1}
+            >
+              Назад
+            </button>
+            <button
+              className="button button--secondary"
+              onClick={() => setPage(pagination.page + 1)}
+              disabled={
+                isLoading ||
+                pagination.totalPages === 0 ||
+                pagination.page >= pagination.totalPages
+              }
+            >
+              Далее
+            </button>
+          </div>
         </div>
       </div>
     </section>

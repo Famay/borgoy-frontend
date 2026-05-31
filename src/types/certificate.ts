@@ -2,7 +2,24 @@ export type CertificateStatus =
   | "Подтвержден"
   | "На проверке"
   | "Есть расхождения"
-  | "Ошибка blockchain";
+  | "Ошибка blockchain"
+  | "Аннулирован";
+
+export type CertificateHistoryAction = "CREATED" | "STATUS_UPDATED" | "CANCELLED";
+
+export interface CertificateHistoryEntry {
+  id: string;
+  action: CertificateHistoryAction;
+  previousStatus?: CertificateStatus;
+  nextStatus: CertificateStatus;
+  message: string;
+  reason?: string;
+  changedBy?: {
+    name: string;
+    role: "supplier" | "admin";
+  };
+  createdAt: string;
+}
 
 export type PageName =
   | "Главная"
@@ -37,6 +54,9 @@ export interface Certificate {
   qrPayload?: string;
   qrCodeDataUrl?: string;
   publicUrl?: string;
+  cancellationReason?: string;
+  cancelledAt?: string;
+  history: CertificateHistoryEntry[];
 }
 
 export interface SupplierForm {

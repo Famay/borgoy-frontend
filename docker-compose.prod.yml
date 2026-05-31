@@ -28,6 +28,7 @@ services:
     env_file:
       - .env
     environment:
+      NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-vermeat}?schema=public
       SERVER_PORT: 4000
       CLIENT_ORIGIN: ${PUBLIC_APP_URL:?PUBLIC_APP_URL is required}

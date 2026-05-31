@@ -21,6 +21,7 @@ export const certificatesSeed: Certificate[] = [
     ipfsCid: "bafybeigdyrztdemo0241",
     qrToken: "borg-2026-0241",
     publicUrl: "/verify?token=borg-2026-0241",
+    history: [],
   },
   {
     id: "CERT-2026-002",
@@ -42,6 +43,7 @@ export const certificatesSeed: Certificate[] = [
     ipfsCid: "bafybeigdyrztdemo0242",
     qrToken: "borg-2026-0242",
     publicUrl: "/verify?token=borg-2026-0242",
+    history: [],
   },
   {
     id: "CERT-2026-003",
@@ -63,5 +65,6 @@ export const certificatesSeed: Certificate[] = [
     ipfsCid: "bafybeigdyrztdemo0243",
     qrToken: "borg-2026-0243",
     publicUrl: "/verify?token=borg-2026-0243",
+    history: [],
   },
 ];

@@ -16,6 +16,8 @@ import AdminLogsPage from "../pages/AdminLogsPage";
 import AdminSuppliersPage from "../pages/AdminSuppliersPage";
 import AdminStatusPage from "../pages/AdminStatusPage";
 import AdminDashboardPage from "../pages/AdminDashboardPage";
+import BatchesPage from "../pages/BatchesPage";
+import BatchDetailsPage from "../pages/BatchDetailsPage";
 
 export default function App() {
   return (
@@ -62,6 +64,24 @@ export default function App() {
                 element={
                   <ProtectedRoute allowedRoles={["supplier"]}>
                     <MyCertificatesPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/batches"
+                element={
+                  <ProtectedRoute allowedRoles={["supplier", "admin"]}>
+                    <BatchesPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/batches/:batchId"
+                element={
+                  <ProtectedRoute allowedRoles={["supplier", "admin"]}>
+                    <BatchDetailsPage />
                   </ProtectedRoute>
                 }
               />

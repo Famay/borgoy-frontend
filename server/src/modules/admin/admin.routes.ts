@@ -2,10 +2,12 @@ import { Router } from "express";
 import { z } from "zod";
 import {
   AuditAction,
+  CertificateHistoryAction,
   CertificateStatus,
   UserRole,
   UserStatus,
 } from "../../../generated/prisma/enums";
+import { Prisma } from "../../../generated/prisma/client";
 import { prisma } from "../../db/prisma";
 import { env } from "../../config/env";
 import { requireAuth, requireRole } from "../../middleware/auth";
@@ -13,9 +15,45 @@ import { asyncHandler } from "../../utils/asyncHandler";
 import { HttpError } from "../../utils/httpError";
 import { getRouteParam } from "../../utils/request";
 
-const auditLogQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(200).default(80),
+const dateOnlySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const supplierListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  query: z
+    .string()
+    .trim()
+    .max(200)
+    .transform((value) => value || undefined)
+    .optional(),
+  status: z.enum(UserStatus).optional(),
 });
+const auditLogQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(25),
+    action: z.enum(AuditAction).optional(),
+    entity: z
+      .string()
+      .trim()
+      .max(100)
+      .transform((value) => value || undefined)
+      .optional(),
+    user: z
+      .string()
+      .trim()
+      .max(200)
+      .transform((value) => value || undefined)
+      .optional(),
+    dateFrom: dateOnlySchema.optional(),
+    dateTo: dateOnlySchema.optional(),
+  })
+  .refine(
+    ({ dateFrom, dateTo }) => !dateFrom || !dateTo || dateFrom <= dateTo,
+    {
+      message: "Начальная дата не может быть позже конечной",
+      path: ["dateFrom"],
+    }
+  );
 
 const updateCertificateStatusSchema = z.object({
   status: z.enum([
@@ -26,17 +64,43 @@ const updateCertificateStatusSchema = z.object({
   ]),
 });
 
+const cancelCertificateSchema = z.object({
+  reason: z.string().trim().min(5).max(500),
+});
+
 const updateSupplierStatusSchema = z.object({
   status: z.enum([UserStatus.ACTIVE, UserStatus.PENDING, UserStatus.BLOCKED]),
 });
+
+const problemCertificateStatuses = [
+  CertificateStatus.MISMATCH,
+  CertificateStatus.BLOCKCHAIN_FAILED,
+  CertificateStatus.CANCELLED,
+];
 
 export const adminRouter = Router();
 
 adminRouter.use(requireAuth, requireRole(UserRole.ADMIN));
 
-function mapSupplierForAdmin(
-  supplier: Awaited<ReturnType<typeof getSuppliersForAdmin>>[number]
-) {
+type SupplierForAdmin = Prisma.UserGetPayload<{
+  include: {
+    batches: {
+      select: {
+        id: true;
+        batchNumber: true;
+        productName: true;
+        createdAt: true;
+        _count: {
+          select: {
+            certificates: true;
+          };
+        };
+      };
+    };
+  };
+}>;
+
+function mapSupplierForAdmin(supplier: SupplierForAdmin) {
   const certificatesTotal = supplier.batches.reduce(
     (total, batch) => total + batch._count.certificates,
     0
@@ -64,29 +128,6 @@ function mapSupplierForAdmin(
         }
       : null,
   };
-}
-
-async function getSuppliersForAdmin() {
-  return prisma.user.findMany({
-    where: { role: UserRole.SUPPLIER },
-    orderBy: { createdAt: "desc" },
-    include: {
-      batches: {
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          batchNumber: true,
-          productName: true,
-          createdAt: true,
-          _count: {
-            select: {
-              certificates: true,
-            },
-          },
-        },
-      },
-    },
-  });
 }
 
 function getEmailStatus() {
@@ -124,6 +165,13 @@ function getEmailStatus() {
 }
 
 function getIpfsStatus() {
+  if (env.INTEGRATION_MODE === "demo") {
+    return {
+      status: "warning",
+      details: "Demo-режим: файлы не загружаются в Pinata/IPFS.",
+    };
+  }
+
   const configured = Boolean(env.PINATA_JWT && env.PINATA_GATEWAY);
 
   return {
@@ -135,6 +183,13 @@ function getIpfsStatus() {
 }
 
 function getBlockchainStatus() {
+  if (env.INTEGRATION_MODE === "demo") {
+    return {
+      status: "warning",
+      details: "Demo-режим: транзакции не отправляются в Polygon Amoy.",
+    };
+  }
+
   const configured = Boolean(
     env.POLYGON_AMOY_RPC_URL &&
       env.POLYGON_PRIVATE_KEY &&
@@ -163,7 +218,19 @@ function getCertificateInclude() {
       },
     },
     blockchainTransaction: true,
-  };
+    history: {
+      include: {
+        changedBy: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    },
+  } as const;
 }
 
 adminRouter.get(
@@ -199,10 +266,7 @@ adminRouter.get(
       prisma.certificate.count({
         where: {
           status: {
-            in: [
-              CertificateStatus.MISMATCH,
-              CertificateStatus.BLOCKCHAIN_FAILED,
-            ],
+            in: problemCertificateStatuses,
           },
         },
       }),
@@ -238,10 +302,7 @@ adminRouter.get(
       prisma.certificate.findMany({
         where: {
           status: {
-            in: [
-              CertificateStatus.MISMATCH,
-              CertificateStatus.BLOCKCHAIN_FAILED,
-            ],
+            in: problemCertificateStatuses,
           },
         },
         take: 5,
@@ -352,10 +413,94 @@ adminRouter.get(
 
 adminRouter.get(
   "/suppliers",
-  asyncHandler(async (_req, res) => {
-    const suppliers = await getSuppliersForAdmin();
+  asyncHandler(async (req, res) => {
+    const { page, pageSize, query, status } = supplierListQuerySchema.parse(
+      req.query
+    );
+    const where: Prisma.UserWhereInput = {
+      role: UserRole.SUPPLIER,
+      ...(status ? { status } : {}),
+      ...(query
+        ? {
+            OR: [
+              { name: { contains: query, mode: "insensitive" } },
+              { companyName: { contains: query, mode: "insensitive" } },
+              { email: { contains: query, mode: "insensitive" } },
+              { inn: { contains: query, mode: "insensitive" } },
+              {
+                batches: {
+                  some: {
+                    batchNumber: { contains: query, mode: "insensitive" },
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+    const supplierWhere = { role: UserRole.SUPPLIER };
+    const [
+      suppliers,
+      total,
+      suppliersTotal,
+      activeSuppliers,
+      blockedSuppliers,
+      supplierCertificatesTotal,
+    ] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        orderBy: { createdAt: "desc" },
+        include: {
+          batches: {
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              batchNumber: true,
+              productName: true,
+              createdAt: true,
+              _count: {
+                select: {
+                  certificates: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+      prisma.user.count({ where }),
+      prisma.user.count({ where: supplierWhere }),
+      prisma.user.count({
+        where: { ...supplierWhere, status: UserStatus.ACTIVE },
+      }),
+      prisma.user.count({
+        where: { ...supplierWhere, status: UserStatus.BLOCKED },
+      }),
+      prisma.certificate.count({
+        where: {
+          batch: {
+            supplier: supplierWhere,
+          },
+        },
+      }),
+    ]);
 
-    res.json({ suppliers: suppliers.map(mapSupplierForAdmin) });
+    res.json({
+      suppliers: suppliers.map(mapSupplierForAdmin),
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      },
+      summary: {
+        suppliersTotal,
+        activeSuppliers,
+        blockedSuppliers,
+        supplierCertificatesTotal,
+      },
+    });
   })
 );
 
@@ -463,10 +608,7 @@ adminRouter.get(
       prisma.certificate.count({
         where: {
           status: {
-            in: [
-              CertificateStatus.MISMATCH,
-              CertificateStatus.BLOCKCHAIN_FAILED,
-            ],
+            in: problemCertificateStatuses,
           },
         },
       }),
@@ -509,23 +651,67 @@ adminRouter.get(
 adminRouter.get(
   "/audit-logs",
   asyncHandler(async (req, res) => {
-    const { limit } = auditLogQuerySchema.parse(req.query);
-    const logs = await prisma.auditLog.findMany({
-      take: limit,
-      orderBy: { createdAt: "desc" },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
+    const { page, pageSize, action, entity, user, dateFrom, dateTo } =
+      auditLogQuerySchema.parse(req.query);
+    const where: Prisma.AuditLogWhereInput = {
+      ...(action ? { action } : {}),
+      ...(entity
+        ? { entity: { contains: entity, mode: "insensitive" } }
+        : {}),
+      ...(user
+        ? {
+            user: {
+              is: {
+                OR: [
+                  { name: { contains: user, mode: "insensitive" } },
+                  { email: { contains: user, mode: "insensitive" } },
+                ],
+              },
+            },
+          }
+        : {}),
+      ...(dateFrom || dateTo
+        ? {
+            createdAt: {
+              ...(dateFrom
+                ? { gte: new Date(`${dateFrom}T00:00:00.000Z`) }
+                : {}),
+              ...(dateTo
+                ? { lte: new Date(`${dateTo}T23:59:59.999Z`) }
+                : {}),
+            },
+          }
+        : {}),
+    };
+    const [logs, total] = await Promise.all([
+      prisma.auditLog.findMany({
+        where,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        orderBy: { createdAt: "desc" },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+            },
           },
         },
+      }),
+      prisma.auditLog.count({ where }),
+    ]);
+
+    res.json({
+      logs,
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
       },
     });
-
-    res.json({ logs });
   })
 );
 
@@ -545,66 +731,66 @@ adminRouter.patch(
     const payload = updateCertificateStatusSchema.parse(req.body);
     const existing = await prisma.certificate.findUnique({
       where: { certificateNo },
-      include: {
-        batch: {
-          include: {
-            supplier: {
-              select: {
-                id: true,
-                name: true,
-                companyName: true,
-              },
-            },
-          },
-        },
-        blockchainTransaction: true,
-      },
+      include: getCertificateInclude(),
     });
 
     if (!existing) {
       throw new HttpError(404, "Сертификат не найден");
     }
 
-    const certificate = await prisma.certificate.update({
-      where: { certificateNo },
-      data: { status: payload.status },
-      include: {
-        batch: {
-          include: {
-            supplier: {
-              select: {
-                id: true,
-                name: true,
-                companyName: true,
-              },
-            },
+    if (existing.status === CertificateStatus.CANCELLED) {
+      throw new HttpError(409, "Аннулированный сертификат нельзя восстановить");
+    }
+
+    if (existing.status === payload.status) {
+      res.json({ certificate: existing });
+      return;
+    }
+
+    const certificate = await prisma.$transaction(async (tx) => {
+      await tx.certificate.update({
+        where: { certificateNo },
+        data: { status: payload.status },
+      });
+
+      await tx.certificateHistory.create({
+        data: {
+          action: CertificateHistoryAction.STATUS_UPDATED,
+          certificateId: existing.id,
+          previousStatus: existing.status,
+          nextStatus: payload.status,
+          message: `Администратор изменил статус сертификата ${existing.certificateNo}: ${existing.status} -> ${payload.status}`,
+          changedById: admin.id,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          action: AuditAction.CERTIFICATE_STATUS_UPDATED,
+          entity: "Certificate",
+          entityId: existing.id,
+          message: `Администратор изменил статус сертификата ${existing.certificateNo}: ${existing.status} -> ${payload.status}`,
+          userId: admin.id,
+          metadata: {
+            certificateNo: existing.certificateNo,
+            previousStatus: existing.status,
+            nextStatus: payload.status,
           },
         },
-        blockchainTransaction: true,
-      },
-    });
+      });
 
-    await prisma.auditLog.create({
-      data: {
-        action: AuditAction.CERTIFICATE_STATUS_UPDATED,
-        entity: "Certificate",
-        entityId: certificate.id,
-        message: `Администратор изменил статус сертификата ${certificate.certificateNo}: ${existing.status} -> ${certificate.status}`,
-        userId: admin.id,
-        metadata: {
-          certificateNo: certificate.certificateNo,
-          previousStatus: existing.status,
-          nextStatus: certificate.status,
-        },
-      },
+      return tx.certificate.findUniqueOrThrow({
+        where: { certificateNo },
+        include: getCertificateInclude(),
+      });
     });
 
     res.json({ certificate });
   })
 );
 
-adminRouter.delete(
-  "/certificates/:certificateNo",
+adminRouter.patch(
+  "/certificates/:certificateNo/cancel",
   asyncHandler(async (req, res) => {
     const admin = req.user;
 
@@ -616,42 +802,69 @@ adminRouter.delete(
       req.params.certificateNo,
       "certificateNo"
     );
+    const payload = cancelCertificateSchema.parse(req.body);
     const certificate = await prisma.certificate.findUnique({
       where: { certificateNo },
-      include: {
-        batch: {
-          select: {
-            batchNumber: true,
-            productName: true,
-          },
-        },
-      },
+      include: getCertificateInclude(),
     });
 
     if (!certificate) {
       throw new HttpError(404, "Сертификат не найден");
     }
 
-    await prisma.certificate.delete({
-      where: { certificateNo },
-    });
+    if (certificate.status === CertificateStatus.CANCELLED) {
+      throw new HttpError(409, "Сертификат уже аннулирован");
+    }
 
-    await prisma.auditLog.create({
-      data: {
-        action: AuditAction.CERTIFICATE_DELETED,
-        entity: "Certificate",
-        entityId: certificate.id,
-        message: `Администратор удалил сертификат ${certificate.certificateNo}`,
-        userId: admin.id,
-        metadata: {
-          certificateNo: certificate.certificateNo,
-          batchNumber: certificate.batch.batchNumber,
-          productName: certificate.batch.productName,
-          fileHash: certificate.fileHash,
+    const cancelledAt = new Date();
+    const cancelledCertificate = await prisma.$transaction(async (tx) => {
+      const updatedCertificate = await tx.certificate.update({
+        where: { certificateNo },
+        data: {
+          status: CertificateStatus.CANCELLED,
+          cancellationReason: payload.reason,
+          cancelledAt,
+          cancelledById: admin.id,
         },
-      },
+      });
+
+      await tx.certificateHistory.create({
+        data: {
+          action: CertificateHistoryAction.CANCELLED,
+          certificateId: certificate.id,
+          previousStatus: certificate.status,
+          nextStatus: CertificateStatus.CANCELLED,
+          message: `Администратор аннулировал сертификат ${certificate.certificateNo}`,
+          reason: payload.reason,
+          changedById: admin.id,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          action: AuditAction.CERTIFICATE_CANCELLED,
+          entity: "Certificate",
+          entityId: certificate.id,
+          message: `Администратор аннулировал сертификат ${certificate.certificateNo}`,
+          userId: admin.id,
+          metadata: {
+            certificateNo: certificate.certificateNo,
+            batchNumber: certificate.batch.batchNumber,
+            productName: certificate.batch.productName,
+            fileHash: certificate.fileHash,
+            previousStatus: certificate.status,
+            reason: payload.reason,
+            cancelledAt: cancelledAt.toISOString(),
+          },
+        },
+      });
+
+      return tx.certificate.findUniqueOrThrow({
+        where: { id: updatedCertificate.id },
+        include: getCertificateInclude(),
+      });
     });
 
-    res.status(204).send();
+    res.json({ certificate: cancelledCertificate });
   })
 );

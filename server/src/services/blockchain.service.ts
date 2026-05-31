@@ -49,11 +49,7 @@ type ChainCertificateTuple = readonly [
 ];
 
 function isBlockchainConfigured() {
-  return Boolean(
-    env.POLYGON_AMOY_RPC_URL?.trim() &&
-      env.POLYGON_PRIVATE_KEY?.trim() &&
-      env.CERTIFICATE_CONTRACT_ADDRESS?.trim()
-  );
+  return env.INTEGRATION_MODE === "live";
 }
 
 function getCertificateId(certificateNo: string) {

@@ -202,6 +202,12 @@ export default function ProfilePage() {
             </button>
             <button
               className="button button--secondary"
+              onClick={() => navigate("/batches")}
+            >
+              Мои партии
+            </button>
+            <button
+              className="button button--secondary"
               onClick={() => navigate("/my-certificates")}
             >
               Мои сертификаты

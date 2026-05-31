@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useCertificates } from "../app/CertificatesContext";
 import CertificateEvidence from "../components/certificates/CertificateEvidence";
+import CertificateHistory from "../components/certificates/CertificateHistory";
 import StatusBadge from "../components/ui/StatusBadge";
 import { verifyCertificateRequest } from "../services/api";
 import type { Certificate } from "../types/certificate";
@@ -245,6 +246,8 @@ export default function VerifyPage() {
   const resultTitle =
     found?.status === "Подтвержден"
       ? "Сертификат подтвержден"
+      : found?.status === "Аннулирован"
+        ? "Сертификат аннулирован"
       : found
         ? "Запись требует внимания"
         : "Запись не найдена";
@@ -374,9 +377,30 @@ export default function VerifyPage() {
                 <div className="detail-card__label">Документ</div>
                 <div className="detail-card__value">{found.documentNumber}</div>
               </div>
+
+              {found.cancellationReason && (
+                <div className="detail-card">
+                  <div className="detail-card__label">
+                    Причина аннулирования
+                  </div>
+                  <div className="detail-card__value">
+                    {found.cancellationReason}
+                  </div>
+                </div>
+              )}
+
+              {found.cancelledAt && (
+                <div className="detail-card">
+                  <div className="detail-card__label">Дата аннулирования</div>
+                  <div className="detail-card__value">
+                    {found.cancelledAt.slice(0, 10)}
+                  </div>
+                </div>
+              )}
             </div>
 
             <CertificateEvidence certificate={found} mode="full" />
+            <CertificateHistory history={found.history} />
           </div>
         ) : (
           <div className="empty-state">

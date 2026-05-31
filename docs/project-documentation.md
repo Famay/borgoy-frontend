@@ -51,7 +51,7 @@ VerMeat - дипломный веб-проект для цифровой вер�
 - управление поставщиками;
 - изменение статусов поставщиков;
 - изменение статуса сертификата;
-- удаление ошибочной записи сертификата;
+- аннулирование ошибочной записи сертификата с указанием причины;
 - журнал аудита;
 - страница состояния системы;
 - профиль администратора.
@@ -67,18 +67,21 @@ VerMeat - дипломный веб-проект для цифровой вер�
 - Ролевой доступ: `SUPPLIER`, `ADMIN`.
 - Создание партий продукции.
 - Загрузка сертификатов через multipart/form-data.
+- Ограничение загружаемых файлов: PDF, PNG или JPEG, не более 10 МБ.
 - Расчет SHA-256 хеша файла на сервере.
 - Проверка дубликатов по хешу файла.
 - Загрузка сертификата в Pinata/IPFS.
 - Фиксация хеша сертификата в Polygon Amoy.
 - Генерация QR-кода публичной проверки.
 - Публичная проверка без авторизации.
+- История изменений сертификата: создание, смена статуса и аннулирование.
+- Rate limiting для входа, подтверждения 2FA и публичной проверки.
 - Сканирование QR-кода через браузерный `BarcodeDetector`, если он поддерживается устройством.
 - Реестр сертификатов с поиском и фильтрами.
 - Страница "Мои сертификаты" для поставщика.
 - Административный dashboard.
 - Управление поставщиками.
-- Журнал аудита.
+- Журнал аудита с фильтрами и пагинацией.
 - Страница состояния системы.
 - Docker/Nginx/PostgreSQL контур для деплоя.
 - Let's Encrypt через Certbot.
@@ -216,6 +219,8 @@ Nginx web container
 | `/register` | Все | Регистрация поставщика |
 | `/supplier` | Поставщик | Создание партии и загрузка сертификата |
 | `/my-certificates` | Поставщик | Сертификаты текущего поставщика |
+| `/batches` | Поставщик, админ | Список партий с поиском и пагинацией |
+| `/batches/:batchId` | Поставщик, админ | Детальная страница партии, сертификаты, QR и история проверок |
 | `/profile` | Поставщик, админ | Профиль пользователя |
 | `/admin` | Админ | Dashboard |
 | `/registry` | Админ | Реестр сертификатов |
@@ -246,7 +251,11 @@ Nginx web container
 - `loginRequest`;
 - `verifyTwoFactorLoginRequest`;
 - `registerRequest`;
+- `getCurrentUserRequest`;
 - `createBatchRequest`;
+- `getBatchesRequest`;
+- `findReusableBatchRequest`;
+- `getBatchDetailsRequest`;
 - `uploadCertificateRequest`;
 - `getCertificatesRequest`;
 - `verifyCertificateRequest`;
@@ -257,7 +266,7 @@ Nginx web container
 - `getAdminSystemStatusRequest`;
 - `getAuditLogsRequest`;
 - `updateCertificateStatusRequest`;
-- `deleteCertificateRequest`.
+- `cancelCertificateRequest`.
 
 ## 8. Backend
 
@@ -331,7 +340,8 @@ https://<domain>/api
 
 | Метод | Endpoint | Доступ | Назначение |
 | --- | --- | --- | --- |
-| GET | `/api/batches` | Поставщик, админ | Список партий. Поставщик видит свои, админ видит все |
+| GET | `/api/batches?page=...&pageSize=...&query=...` | Поставщик, админ | Список партий с поиском и пагинацией. Поставщик видит свои, админ видит все |
+| GET | `/api/batches/:batchId` | Поставщик, админ | Детальная информация о партии, сертификаты, последние проверки и аудит. Поставщик видит только свои партии |
 | POST | `/api/batches` | Поставщик | Создать партию |
 
 ### Certificates
@@ -359,12 +369,12 @@ https://<domain>/api
 | --- | --- | --- | --- |
 | GET | `/api/admin/dashboard` | Админ | Dashboard администратора |
 | GET | `/api/admin/status` | Админ | Состояние системы |
-| GET | `/api/admin/suppliers` | Админ | Список поставщиков |
+| GET | `/api/admin/suppliers?page=...&pageSize=...&query=...&status=...` | Админ | Список поставщиков с поиском, фильтром статуса и пагинацией |
 | PATCH | `/api/admin/suppliers/:supplierId/status` | Админ | Изменить статус поставщика |
 | GET | `/api/admin/overview` | Админ | Сводка для профиля администратора |
-| GET | `/api/admin/audit-logs` | Админ | Журнал аудита |
+| GET | `/api/admin/audit-logs?page=...&pageSize=...&action=...&entity=...&user=...&dateFrom=...&dateTo=...` | Админ | Журнал аудита с фильтрами и пагинацией |
 | PATCH | `/api/admin/certificates/:certificateNo/status` | Админ | Изменить статус сертификата |
-| DELETE | `/api/admin/certificates/:certificateNo` | Админ | Удалить сертификат |
+| PATCH | `/api/admin/certificates/:certificateNo/cancel` | Админ | Аннулировать сертификат с указанием причины |
 
 ## 10. База данных
 
@@ -388,7 +398,8 @@ https://<domain>/api
 - `PENDING`;
 - `CONFIRMED`;
 - `MISMATCH`;
-- `BLOCKCHAIN_FAILED`.
+- `BLOCKCHAIN_FAILED`;
+- `CANCELLED`.
 
 `AuditAction`:
 
@@ -402,6 +413,7 @@ https://<domain>/api
 - `CERTIFICATE_UPLOADED`;
 - `CERTIFICATE_STATUS_UPDATED`;
 - `CERTIFICATE_DELETED`;
+- `CERTIFICATE_CANCELLED`;
 - `CERTIFICATE_VERIFIED`;
 - `VERIFICATION_FAILED`.
 
@@ -466,7 +478,10 @@ https://<domain>/api
 - `ipfsCid`;
 - `qrPayload`;
 - `qrCodeDataUrl`;
-- `batchId`.
+- `batchId`;
+- `cancellationReason`;
+- `cancelledAt`;
+- `cancelledById`.
 
 #### BlockchainTransaction
 
@@ -480,6 +495,22 @@ https://<domain>/api
 - `txHash`;
 - `blockNumber`;
 - `certificateId`;
+- `createdAt`.
+
+#### CertificateHistory
+
+Хранит хронологию изменений конкретного сертификата.
+
+Основные поля:
+
+- `id`;
+- `action`;
+- `previousStatus`;
+- `nextStatus`;
+- `message`;
+- `reason`;
+- `certificateId`;
+- `changedById`;
 - `createdAt`.
 
 #### VerificationResult
@@ -524,7 +555,9 @@ https://<domain>/api
 5. Пароль хешируется через bcrypt.
 6. Создается пользователь с ролью `SUPPLIER`.
 7. Для поставщика включена двухфакторная идентификация.
-8. Возвращается пользователь и JWT.
+8. Возвращается созданный пользователь без JWT.
+9. Frontend переводит поставщика на страницу входа.
+10. JWT выдается только после ввода пароля и подтверждения email-кода.
 
 ### Вход поставщика
 
@@ -552,15 +585,16 @@ https://<domain>/api
 1. Поставщик выбирает созданную партию.
 2. Загружает файл сертификата и вводит метаданные документа.
 3. Frontend отправляет multipart-запрос `POST /api/batches/:batchId/certificates`.
-4. Backend проверяет, что партия принадлежит текущему поставщику.
-5. Сервер рассчитывает SHA-256 от содержимого файла.
-6. Выполняется проверка дубликата по `fileHash`.
-7. Файл загружается в Pinata/IPFS.
-8. Backend регистрирует сертификат в смарт-контракте.
-9. Генерируется QR-код публичной проверки.
-10. В PostgreSQL создается `Certificate` и `BlockchainTransaction`.
-11. В `AuditLog` пишется событие загрузки.
-12. Frontend показывает результат: сертификат, CID, tx hash, QR-код, публичную ссылку.
+4. Backend принимает только PDF, PNG или JPEG размером не более 10 МБ.
+5. Backend проверяет, что партия принадлежит текущему поставщику.
+6. Сервер рассчитывает SHA-256 от содержимого файла.
+7. Выполняется проверка дубликата по `fileHash`.
+8. Файл загружается в Pinata/IPFS.
+9. Backend регистрирует сертификат в смарт-контракте.
+10. Генерируется QR-код публичной проверки.
+11. В PostgreSQL создается `Certificate`, `BlockchainTransaction` и начальная запись `CertificateHistory`.
+12. В `AuditLog` пишется событие загрузки.
+13. Frontend показывает результат: сертификат, CID, tx hash, QR-код, публичную ссылку и историю изменений.
 
 ### Публичная проверка
 
@@ -621,11 +655,15 @@ IPFS используется для хранения файлов сертиф�
 5. CID сохраняется в таблице `Certificate`.
 6. Gateway URL используется для открытия файла.
 
-Если `PINATA_JWT` не задан, система работает в demo-режиме и генерирует демонстрационный CID. Это удобно для локальной разработки, но production-проверка должна использовать настоящий Pinata/IPFS.
+При `INTEGRATION_MODE=demo` система генерирует демонстрационный CID и не
+загружает файл в Pinata. Это удобно для локальной разработки и тестов.
+При `INTEGRATION_MODE=live` обязательны все настройки Pinata и Polygon.
+Production-запуск разрешен только с `INTEGRATION_MODE=live`.
 
 ### Переменные
 
 ```env
+INTEGRATION_MODE=demo
 PINATA_JWT=
 PINATA_GATEWAY=
 ```
@@ -971,7 +1009,7 @@ npm.cmd run hardhat:test
 - создание партии;
 - загрузку сертификата;
 - изменение статуса сертификата;
-- удаление сертификата;
+- аннулирование сертификата;
 - публичную проверку;
 - неуспешную проверку;
 - изменение статуса поставщика.
@@ -981,6 +1019,9 @@ npm.cmd run hardhat:test
 ```text
 /admin/logs
 ```
+
+Доступны фильтры по диапазону дат, действию, пользователю и сущности. Записи
+выдаются постранично.
 
 ## 24. Страница состояния системы
 
@@ -1054,22 +1095,24 @@ server/email-outbox/2fa-codes.txt
 
 ### IPFS работает в demo-режиме
 
-Причина: не задан `PINATA_JWT`.
+Причина: задано `INTEGRATION_MODE=demo`.
 
-Решение: заполнить:
+Решение для production: включить live-режим и заполнить:
 
 ```env
+INTEGRATION_MODE=live
 PINATA_JWT=
 PINATA_GATEWAY=
 ```
 
 ### Blockchain работает в demo-режиме
 
-Причина: не заполнены переменные Polygon.
+Причина: задано `INTEGRATION_MODE=demo`.
 
-Решение: заполнить:
+Решение для production: включить live-режим и заполнить:
 
 ```env
+INTEGRATION_MODE=live
 POLYGON_AMOY_RPC_URL=
 POLYGON_PRIVATE_KEY=
 CERTIFICATE_CONTRACT_ADDRESS=
@@ -1092,6 +1135,7 @@ CERTIFICATE_CONTRACT_ADDRESS=
 - [ ] `.env` заполнен production-значениями;
 - [ ] `JWT_SECRET` заменен на длинный случайный секрет;
 - [ ] `POSTGRES_PASSWORD` заменен;
+- [ ] задано `INTEGRATION_MODE=live`;
 - [ ] `PUBLIC_APP_URL` указывает на HTTPS-домен;
 - [ ] `CLIENT_ORIGIN` указывает на HTTPS-домен;
 - [ ] DNS домена указывает на сервер;
@@ -1111,9 +1155,9 @@ CERTIFICATE_CONTRACT_ADDRESS=
 ## 28. Ограничения текущей версии
 
 - Проект является дипломным прототипом, а не промышленной системой.
-- Нет полноценного rate limiting для публичных запросов и входа.
+- In-memory rate limiting рассчитан на один API-процесс. Для нескольких
+  экземпляров API потребуется общее хранилище, например Redis.
 - Нет автоматического backup-регламента внутри приложения.
-- Удаление сертификата администратором пока физическое, в дальнейшем лучше заменить на аннулирование.
 - Нет отдельной роли аудитора или оператора.
 - Нет импорта партий из CSV/XLSX.
 - Нет production-мониторинга с метриками и алертами.
@@ -1121,16 +1165,10 @@ CERTIFICATE_CONTRACT_ADDRESS=
 
 ## 29. Рекомендуемые дальнейшие улучшения
 
-1. Добавить rate limiting для `/api/auth/login`, `/api/auth/login/2fa` и `/api/public/verify`.
-2. Заменить удаление сертификата на аннулирование с причиной.
-3. Добавить историю изменений сертификата.
-4. Добавить экспорт QR-этикеток в PDF/PNG.
-5. Добавить детальную страницу партии.
-6. Добавить фильтры в журнал аудита.
-7. Добавить автоматические интеграционные тесты API.
-8. Добавить резервное копирование PostgreSQL по расписанию.
-9. Добавить production-мониторинг.
-10. Подготовить миграцию с Polygon Amoy на основную сеть или корпоративную сеть при необходимости.
+1. Добавить экспорт QR-этикеток в PDF/PNG.
+2. Добавить резервное копирование PostgreSQL по расписанию.
+3. Добавить production-мониторинг.
+4. Подготовить миграцию с Polygon Amoy на основную сеть или корпоративную сеть при необходимости.
 
 ## 30. Краткий порядок демонстрации проекта
 
@@ -1145,4 +1183,3 @@ CERTIFICATE_CONTRACT_ADDRESS=
 9. Показать результат проверки.
 10. Войти администратором.
 11. Показать dashboard, реестр, поставщиков, журнал аудита и состояние системы.
-

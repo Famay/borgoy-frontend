@@ -5,6 +5,7 @@ const titles: Record<string, string> = {
   "/": "VerMeat - система верификации продукции",
   "/about": "О проекте",
   "/supplier": "Кабинет поставщика",
+  "/batches": "Партии",
   "/registry": "Реестр сертификатов",
   "/verify": "Проверка подлинности",
   "/profile": "Профиль пользователя",
@@ -31,7 +32,9 @@ export default function Header() {
       <div>
         <div className="topbar__label">Цифровая прослеживаемость</div>
         <h1 className="topbar__title">
-          {titles[location.pathname] ?? "VerMeat"}
+          {location.pathname.startsWith("/batches/")
+            ? "Детали партии"
+            : titles[location.pathname] ?? "VerMeat"}
         </h1>
       </div>
 

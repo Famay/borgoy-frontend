@@ -1,6 +1,42 @@
-import { useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { useAuth } from "../app/AuthContext";
-import { getAuditLogsRequest, type AuditLogEntry } from "../services/api";
+import {
+  getAuditLogsRequest,
+  type AuditLogEntry,
+  type AuditLogFilters,
+  type AuditLogPagination,
+} from "../services/api";
+
+const actionOptions = [
+  ["", "Все действия"],
+  ["USER_REGISTERED", "Регистрация пользователя"],
+  ["USER_STATUS_UPDATED", "Изменение статуса поставщика"],
+  ["USER_LOGIN", "Вход в систему"],
+  ["USER_LOGIN_2FA_FAILED", "Ошибка второго фактора"],
+  ["BATCH_CREATED", "Создание партии"],
+  ["CERTIFICATE_UPLOADED", "Загрузка сертификата"],
+  ["CERTIFICATE_STATUS_UPDATED", "Изменение статуса сертификата"],
+  ["CERTIFICATE_CANCELLED", "Аннулирование сертификата"],
+  ["CERTIFICATE_VERIFIED", "Публичная проверка"],
+  ["VERIFICATION_FAILED", "Ошибка проверки"],
+] as const;
+
+const defaultFilters: AuditLogFilters = {
+  page: 1,
+  pageSize: 25,
+  action: "",
+  entity: "",
+  user: "",
+  dateFrom: "",
+  dateTo: "",
+};
+
+const defaultPagination: AuditLogPagination = {
+  page: 1,
+  pageSize: 25,
+  total: 0,
+  totalPages: 0,
+};
 
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("ru-RU", {
@@ -12,6 +48,11 @@ function formatDateTime(value: string) {
 export default function AdminLogsPage() {
   const { token } = useAuth();
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
+  const [filters, setFilters] = useState<AuditLogFilters>(defaultFilters);
+  const [appliedFilters, setAppliedFilters] =
+    useState<AuditLogFilters>(defaultFilters);
+  const [pagination, setPagination] =
+    useState<AuditLogPagination>(defaultPagination);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -24,7 +65,10 @@ export default function AdminLogsPage() {
     setIsLoading(true);
 
     try {
-      setLogs(await getAuditLogsRequest(token, 120));
+      const result = await getAuditLogsRequest(token, appliedFilters);
+
+      setLogs(result.logs);
+      setPagination(result.pagination);
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -34,7 +78,21 @@ export default function AdminLogsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [appliedFilters, token]);
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAppliedFilters({ ...filters, page: 1 });
+  };
+
+  const handleReset = () => {
+    setFilters(defaultFilters);
+    setAppliedFilters(defaultFilters);
+  };
+
+  const setPage = (page: number) => {
+    setAppliedFilters((current) => ({ ...current, page }));
+  };
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -66,6 +124,104 @@ export default function AdminLogsPage() {
         </div>
 
         {error && <div className="form-error">{error}</div>}
+
+        <form className="audit-log-filters" onSubmit={handleSubmit}>
+          <select
+            value={filters.action}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                action: event.target.value,
+              }))
+            }
+          >
+            {actionOptions.map(([value, label]) => (
+              <option key={value || "all"} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+
+          <input
+            value={filters.entity}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                entity: event.target.value,
+              }))
+            }
+            placeholder="Сущность: Certificate, User..."
+          />
+
+          <input
+            value={filters.user}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                user: event.target.value,
+              }))
+            }
+            placeholder="Пользователь: имя или email"
+          />
+
+          <label>
+            <span>От</span>
+            <input
+              type="date"
+              value={filters.dateFrom}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  dateFrom: event.target.value,
+                }))
+              }
+            />
+          </label>
+
+          <label>
+            <span>До</span>
+            <input
+              type="date"
+              value={filters.dateTo}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  dateTo: event.target.value,
+                }))
+              }
+            />
+          </label>
+
+          <label>
+            <span>На странице</span>
+            <select
+              value={filters.pageSize}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  pageSize: Number(event.target.value),
+                }))
+              }
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+            </select>
+          </label>
+
+          <div className="actions-row audit-log-filters__actions">
+            <button className="button button--primary" type="submit">
+              Применить
+            </button>
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={handleReset}
+            >
+              Сбросить
+            </button>
+          </div>
+        </form>
 
         <div className="table-wrapper">
           <table className="data-table">
@@ -107,6 +263,33 @@ export default function AdminLogsPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="audit-log-pagination">
+          <span>
+            Всего записей: {pagination.total}. Страница {pagination.page} из{" "}
+            {Math.max(pagination.totalPages, 1)}.
+          </span>
+          <div className="actions-row">
+            <button
+              className="button button--secondary"
+              onClick={() => setPage(pagination.page - 1)}
+              disabled={isLoading || pagination.page <= 1}
+            >
+              Назад
+            </button>
+            <button
+              className="button button--secondary"
+              onClick={() => setPage(pagination.page + 1)}
+              disabled={
+                isLoading ||
+                pagination.totalPages === 0 ||
+                pagination.page >= pagination.totalPages
+              }
+            >
+              Далее
+            </button>
+          </div>
         </div>
       </div>
     </section>

@@ -1,5 +1,6 @@
 import cors from "cors";
 import express from "express";
+import multer from "multer";
 import { ZodError } from "zod";
 import { Prisma } from "../generated/prisma/client";
 import { env } from "./config/env";
@@ -107,6 +108,8 @@ function getUniqueConstraintMessage(error: Prisma.PrismaClientKnownRequestError)
 export function createApp() {
   const app = express();
 
+  app.set("trust proxy", 1);
+
   app.use(
     cors({
       origin: (origin, callback) => {
@@ -158,6 +161,18 @@ export function createApp() {
         res.status(400).json({
           message: "Ошибка валидации",
           issues: error.issues,
+        });
+        return;
+      }
+
+      if (error instanceof multer.MulterError) {
+        const message =
+          error.code === "LIMIT_FILE_SIZE"
+            ? "Файл сертификата превышает допустимый размер 10 МБ"
+            : "Не удалось обработать файл сертификата";
+
+        res.status(error.code === "LIMIT_FILE_SIZE" ? 413 : 400).json({
+          message,
         });
         return;
       }

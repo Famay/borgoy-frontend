@@ -77,7 +77,11 @@ export function signTwoFactorChallengeToken(userId: string) {
 }
 
 export function verifyTwoFactorChallengeToken(token: string) {
-  return parseTwoFactorChallengePayload(jwt.verify(token, env.JWT_SECRET));
+  try {
+    return parseTwoFactorChallengePayload(jwt.verify(token, env.JWT_SECRET));
+  } catch {
+    throw new HttpError(401, "Недействительный код подтверждения");
+  }
 }
 
 export async function requireAuth(
@@ -93,42 +97,46 @@ export async function requireAuth(
     return;
   }
 
+  let payload: AccessTokenPayload;
+
   try {
-    const payload = parseAccessTokenPayload(jwt.verify(token, env.JWT_SECRET));
-    const user = await prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        status: true,
-      },
-    });
-
-    if (!user) {
-      next(new HttpError(401, "Недействительный токен"));
-      return;
-    }
-
-    if (user.status === UserStatus.BLOCKED) {
-      next(new HttpError(403, "Учетная запись заблокирована"));
-      return;
-    }
-
-    if (user.status !== UserStatus.ACTIVE) {
-      next(new HttpError(403, "Учетная запись ожидает подтверждения"));
-      return;
-    }
-
-    req.user = {
-      id: user.id,
-      role: user.role,
-      email: user.email,
-    };
-    next();
+    payload = parseAccessTokenPayload(jwt.verify(token, env.JWT_SECRET));
   } catch {
     next(new HttpError(401, "Недействительный токен"));
+    return;
   }
+
+  const user = await prisma.user.findUnique({
+    where: { id: payload.sub },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      status: true,
+    },
+  });
+
+  if (!user) {
+    next(new HttpError(401, "Недействительный токен"));
+    return;
+  }
+
+  if (user.status === UserStatus.BLOCKED) {
+    next(new HttpError(403, "Учетная запись заблокирована"));
+    return;
+  }
+
+  if (user.status !== UserStatus.ACTIVE) {
+    next(new HttpError(403, "Учетная запись ожидает подтверждения"));
+    return;
+  }
+
+  req.user = {
+    id: user.id,
+    role: user.role,
+    email: user.email,
+  };
+  next();
 }
 
 export function requireRole(...roles: UserRole[]) {

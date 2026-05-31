@@ -5,6 +5,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, Prisma } from "../server/generated/prisma/client";
 import {
   AuditAction,
+  CertificateHistoryAction,
   CertificateStatus,
   UserRole,
   UserStatus,
@@ -337,6 +338,25 @@ async function main() {
       },
       select: { id: true },
     });
+
+    const historyExists = await prisma.certificateHistory.findFirst({
+      where: {
+        certificateId: savedCertificate.id,
+        action: CertificateHistoryAction.CREATED,
+      },
+      select: { id: true },
+    });
+
+    if (!historyExists) {
+      await prisma.certificateHistory.create({
+        data: {
+          action: CertificateHistoryAction.CREATED,
+          nextStatus: certificate.status,
+          message: "Начальное состояние демонстрационного сертификата",
+          certificateId: savedCertificate.id,
+        },
+      });
+    }
 
     if (certificate.txHash) {
       await prisma.blockchainTransaction.upsert({

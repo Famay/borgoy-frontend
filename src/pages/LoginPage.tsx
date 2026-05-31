@@ -4,6 +4,7 @@ import { useAuth } from "../app/AuthContext";
 import { getDefaultRouteForRole } from "../utils/auth";
 
 interface LocationState {
+  message?: string;
   from?: {
     pathname: string;
   };
@@ -24,9 +25,9 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isTwoFactorStep = twoFactorChallengeToken.length > 0;
+  const state = location.state as LocationState | null;
 
   const navigateAfterLogin = (role: "guest" | "supplier" | "admin") => {
-    const state = location.state as LocationState | null;
     const nextPath = state?.from?.pathname ?? getDefaultRouteForRole(role);
 
     navigate(nextPath, { replace: true });
@@ -147,6 +148,9 @@ export default function LoginPage() {
           )}
 
           {error && <div className="form-error">{error}</div>}
+          {!error && state?.message && (
+            <div className="success-panel">{state.message}</div>
+          )}
 
           <button
             type="submit"

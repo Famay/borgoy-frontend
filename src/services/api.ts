@@ -1,5 +1,9 @@
 import type { AuthUser, UserRole } from "../types/auth";
-import type { Certificate, CertificateStatus } from "../types/certificate";
+import type {
+  Certificate,
+  CertificateHistoryEntry,
+  CertificateStatus,
+} from "../types/certificate";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:4000/api";
 
@@ -8,7 +12,8 @@ type ApiCertificateStatus =
   | "PENDING"
   | "CONFIRMED"
   | "MISMATCH"
-  | "BLOCKCHAIN_FAILED";
+  | "BLOCKCHAIN_FAILED"
+  | "CANCELLED";
 
 interface ApiUser {
   id: string;
@@ -28,17 +33,68 @@ interface ApiBatch {
   productionDate: string;
   weightKg: string | number;
   publicToken: string;
+  createdAt?: string;
   supplier?: {
     id?: string;
     name: string;
     companyName?: string | null;
+    email?: string;
   };
+}
+
+interface ApiBatchListItem extends ApiBatch {
+  createdAt: string;
+  _count?: {
+    certificates: number;
+  };
+  certificates?: unknown[];
+}
+
+interface ApiBatchVerificationCheck {
+  id: string;
+  query: string;
+  isValid: boolean;
+  message: string;
+  createdAt: string;
+  certificate?: {
+    id: string;
+    certificateNo: string;
+  } | null;
+}
+
+interface ApiBatchDetailsResponse {
+  batch: ApiBatch & {
+    description?: string | null;
+    createdAt: string;
+    updatedAt: string;
+    certificates: Array<Omit<ApiCertificate, "batch">>;
+    checks: ApiBatchVerificationCheck[];
+  };
+  verificationSummary: {
+    total: number;
+    failed: number;
+  };
+  auditLogs: ApiAuditLog[];
 }
 
 interface ApiBlockchainTransaction {
   txHash: string;
   contract?: string | null;
   blockNumber?: number | null;
+}
+
+interface ApiCertificateHistory {
+  id: string;
+  action: "CREATED" | "STATUS_UPDATED" | "CANCELLED";
+  previousStatus?: ApiCertificateStatus | null;
+  nextStatus: ApiCertificateStatus;
+  message: string;
+  reason?: string | null;
+  changedBy?: {
+    name: string;
+    role: ApiRole;
+  } | null;
+  createdAt: string;
 }
 
 interface ApiCertificate {
@@ -56,6 +112,9 @@ interface ApiCertificate {
   ipfsGatewayUrl?: string | null;
   qrPayload?: string | null;
   qrCodeDataUrl?: string | null;
+  cancellationReason?: string | null;
+  cancelledAt?: string | null;
+  history?: ApiCertificateHistory[];
   batch: ApiBatch;
   blockchainTransaction?: ApiBlockchainTransaction | null;
 }
@@ -63,6 +122,10 @@ interface ApiCertificate {
 interface AuthResponse {
   user: ApiUser;
   token: string;
+}
+
+interface RegisterResponse {
+  user: ApiUser;
 }
 
 interface TwoFactorChallengeResponse {
@@ -228,6 +291,16 @@ export interface AdminOverview {
   failedVerificationChecks: number;
 }
 
+export class ApiRequestError extends Error {
+  readonly statusCode: number;
+
+  constructor(message: string, statusCode: number) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.statusCode = statusCode;
+  }
+}
+
 export interface AdminFailedVerification {
   id: string;
   query: string;
@@ -275,6 +348,88 @@ export interface AdminSupplier {
   } | null;
 }
 
+export interface ListPagination {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface BatchListFilters {
+  page?: number;
+  pageSize?: number;
+  query?: string;
+}
+
+export interface BatchListItem {
+  id: string;
+  batchNumber: string;
+  productName: string;
+  originRegion: string;
+  productionDate: string;
+  weightKg: number;
+  publicToken: string;
+  createdAt: string;
+  certificatesTotal: number;
+  supplier?: {
+    name: string;
+    companyName?: string | null;
+    email?: string;
+  };
+}
+
+export interface BatchVerificationCheck {
+  id: string;
+  query: string;
+  isValid: boolean;
+  message: string;
+  createdAt: string;
+  certificate?: {
+    id: string;
+    certificateNo: string;
+  } | null;
+}
+
+export interface BatchDetails {
+  id: string;
+  batchNumber: string;
+  productName: string;
+  originRegion: string;
+  productionDate: string;
+  weightKg: number;
+  description?: string | null;
+  publicToken: string;
+  publicUrl: string;
+  createdAt: string;
+  updatedAt: string;
+  supplier?: {
+    name: string;
+    companyName?: string | null;
+    email?: string;
+  };
+  certificates: Certificate[];
+  checks: BatchVerificationCheck[];
+  verificationSummary: {
+    total: number;
+    failed: number;
+  };
+  auditLogs: AuditLogEntry[];
+}
+
+export interface AdminSupplierFilters {
+  page?: number;
+  pageSize?: number;
+  query?: string;
+  status?: AdminSupplierStatus | "";
+}
+
+export interface AdminSupplierSummary {
+  suppliersTotal: number;
+  activeSuppliers: number;
+  blockedSuppliers: number;
+  supplierCertificatesTotal: number;
+}
+
 export type AdminServiceStatus = ApiServiceStatus;
 export type AdminSystemStatus = ApiAdminSystemStatus;
 
@@ -301,6 +456,23 @@ export interface AuditLogEntry {
   } | null;
 }
 
+export interface AuditLogFilters {
+  page?: number;
+  pageSize?: number;
+  action?: string;
+  entity?: string;
+  user?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface AuditLogPagination {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
 function mapRole(role: ApiRole): UserRole {
   return role === "ADMIN" ? "admin" : "supplier";
 }
@@ -317,6 +489,7 @@ function mapAuditAction(action: string) {
     CERTIFICATE_UPLOADED: "Загрузка сертификата",
     CERTIFICATE_STATUS_UPDATED: "Изменение статуса сертификата",
     CERTIFICATE_DELETED: "Удаление сертификата",
+    CERTIFICATE_CANCELLED: "Аннулирование сертификата",
     CERTIFICATE_VERIFIED: "Публичная проверка",
     VERIFICATION_FAILED: "Ошибка проверки",
   };
@@ -357,6 +530,10 @@ function mapStatus(status: ApiCertificateStatus): CertificateStatus {
     return "Есть расхождения";
   }
 
+  if (status === "CANCELLED") {
+    return "Аннулирован";
+  }
+
   return "На проверке";
 }
 
@@ -371,6 +548,10 @@ function mapStatusToApi(status: CertificateStatus): ApiCertificateStatus {
 
   if (status === "Ошибка blockchain") {
     return "BLOCKCHAIN_FAILED";
+  }
+
+  if (status === "Аннулирован") {
+    throw new Error("Для аннулирования сертификата укажите причину");
   }
 
   return "PENDING";
@@ -427,6 +608,28 @@ function createIpfsUrl(cid?: string | null) {
   return `https://ipfs.io/ipfs/${encodeURIComponent(cid)}`;
 }
 
+function mapCertificateHistory(
+  history: ApiCertificateHistory
+): CertificateHistoryEntry {
+  return {
+    id: history.id,
+    action: history.action,
+    previousStatus: history.previousStatus
+      ? mapStatus(history.previousStatus)
+      : undefined,
+    nextStatus: mapStatus(history.nextStatus),
+    message: history.message,
+    reason: history.reason ?? undefined,
+    changedBy: history.changedBy
+      ? {
+          name: history.changedBy.name,
+          role: mapRole(history.changedBy.role) as "supplier" | "admin",
+        }
+      : undefined,
+    createdAt: history.createdAt,
+  };
+}
+
 export function mapCertificate(certificate: ApiCertificate): Certificate {
   const publicUrl = `/verify?token=${certificate.batch.publicToken}`;
   const blockchainTransaction = certificate.blockchainTransaction;
@@ -459,6 +662,9 @@ export function mapCertificate(certificate: ApiCertificate): Certificate {
     qrPayload: certificate.qrPayload ?? undefined,
     qrCodeDataUrl: certificate.qrCodeDataUrl ?? undefined,
     publicUrl,
+    cancellationReason: certificate.cancellationReason ?? undefined,
+    cancelledAt: certificate.cancelledAt ?? undefined,
+    history: (certificate.history ?? []).map(mapCertificateHistory),
   };
 }
 
@@ -503,7 +709,7 @@ async function request<T>(
         ? payload.message
         : "Не удалось выполнить запрос";
 
-    throw new Error(errorMessage);
+    throw new ApiRequestError(errorMessage, response.status);
   }
 
   return payload as T;
@@ -562,15 +768,20 @@ export async function verifyTwoFactorLoginRequest(
 }
 
 export async function registerRequest(payload: RegisterPayload) {
-  const response = await request<AuthResponse>("/auth/register", {
+  const response = await request<RegisterResponse>("/auth/register", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 
   return {
     user: mapUser(response.user),
-    token: response.token,
   };
+}
+
+export async function getCurrentUserRequest(token: string) {
+  const response = await request<{ user: ApiUser }>("/auth/me", { token });
+
+  return mapUser(response.user);
 }
 
 export async function createBatchRequest(
@@ -582,6 +793,99 @@ export async function createBatchRequest(
     token,
     body: JSON.stringify(payload),
   });
+}
+
+export async function getBatchesRequest(
+  token: string,
+  filters: BatchListFilters = {}
+) {
+  const params = new URLSearchParams();
+
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") {
+      params.set(key, String(value));
+    }
+  });
+
+  const response = await request<{
+    batches: ApiBatchListItem[];
+    pagination?: ListPagination;
+  }>(`/batches?${params.toString()}`, { token });
+  const batches = response.batches.map((batch) => ({
+    id: batch.id,
+    batchNumber: batch.batchNumber,
+    productName: batch.productName,
+    originRegion: batch.originRegion,
+    productionDate: batch.productionDate.slice(0, 10),
+    weightKg: Number(batch.weightKg),
+    publicToken: batch.publicToken,
+    createdAt: batch.createdAt,
+    certificatesTotal:
+      batch._count?.certificates ?? batch.certificates?.length ?? 0,
+    supplier: batch.supplier,
+  }));
+
+  return {
+    batches,
+    pagination: response.pagination ?? {
+      page: 1,
+      pageSize: batches.length,
+      total: batches.length,
+      totalPages: batches.length > 0 ? 1 : 0,
+    },
+  };
+}
+
+export async function findReusableBatchRequest(
+  batchNumber: string,
+  token: string
+) {
+  const result = await getBatchesRequest(token, {
+    page: 1,
+    pageSize: 100,
+    query: batchNumber,
+  });
+  const normalizedBatchNumber = batchNumber.trim().toLowerCase();
+
+  return (
+    result.batches.find(
+      (batch) =>
+        batch.batchNumber.toLowerCase() === normalizedBatchNumber &&
+        batch.certificatesTotal === 0
+    ) ?? null
+  );
+}
+
+export async function getBatchDetailsRequest(batchId: string, token: string) {
+  const response = await request<ApiBatchDetailsResponse>(
+    `/batches/${encodeURIComponent(batchId)}`,
+    { token }
+  );
+  const { batch } = response;
+
+  return {
+    id: batch.id,
+    batchNumber: batch.batchNumber,
+    productName: batch.productName,
+    originRegion: batch.originRegion,
+    productionDate: batch.productionDate.slice(0, 10),
+    weightKg: Number(batch.weightKg),
+    description: batch.description,
+    publicToken: batch.publicToken,
+    publicUrl: `/verify?token=${batch.publicToken}`,
+    createdAt: batch.createdAt,
+    updatedAt: batch.updatedAt,
+    supplier: batch.supplier,
+    certificates: batch.certificates.map((certificate) =>
+      mapCertificate({
+        ...certificate,
+        batch,
+      })
+    ),
+    checks: batch.checks,
+    verificationSummary: response.verificationSummary,
+    auditLogs: response.auditLogs.map(mapAuditLog),
+  } satisfies BatchDetails;
 }
 
 export async function getCertificatesRequest(token: string) {
@@ -618,13 +922,29 @@ export async function getAdminDashboardRequest(token: string) {
   };
 }
 
-export async function getAdminSuppliersRequest(token: string) {
-  const response = await request<{ suppliers: ApiAdminSupplier[] }>(
-    "/admin/suppliers",
-    { token }
-  );
+export async function getAdminSuppliersRequest(
+  token: string,
+  filters: AdminSupplierFilters = {}
+) {
+  const params = new URLSearchParams();
 
-  return response.suppliers.map(mapAdminSupplier);
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") {
+      params.set(key, String(value));
+    }
+  });
+
+  const response = await request<{
+    suppliers: ApiAdminSupplier[];
+    pagination: ListPagination;
+    summary: AdminSupplierSummary;
+  }>(`/admin/suppliers?${params.toString()}`, { token });
+
+  return {
+    suppliers: response.suppliers.map(mapAdminSupplier),
+    pagination: response.pagination,
+    summary: response.summary,
+  };
 }
 
 export async function updateSupplierStatusRequest(
@@ -648,14 +968,30 @@ export async function getAdminSystemStatusRequest(token: string) {
   return request<AdminSystemStatus>("/admin/status", { token });
 }
 
-export async function getAuditLogsRequest(token: string, limit = 80) {
-  const params = new URLSearchParams({ limit: String(limit) });
-  const response = await request<{ logs: ApiAuditLog[] }>(
+export async function getAuditLogsRequest(
+  token: string,
+  filters: AuditLogFilters = {}
+) {
+  const params = new URLSearchParams();
+
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") {
+      params.set(key, String(value));
+    }
+  });
+
+  const response = await request<{
+    logs: ApiAuditLog[];
+    pagination: AuditLogPagination;
+  }>(
     `/admin/audit-logs?${params.toString()}`,
     { token }
   );
 
-  return response.logs.map(mapAuditLog);
+  return {
+    logs: response.logs.map(mapAuditLog),
+    pagination: response.pagination,
+  };
 }
 
 export async function updateCertificateStatusRequest(
@@ -675,17 +1011,21 @@ export async function updateCertificateStatusRequest(
   return mapCertificate(response.certificate);
 }
 
-export async function deleteCertificateRequest(
+export async function cancelCertificateRequest(
   certificateNo: string,
+  reason: string,
   token: string
 ) {
-  await request<void>(
-    `/admin/certificates/${encodeURIComponent(certificateNo)}`,
+  const response = await request<{ certificate: ApiCertificate }>(
+    `/admin/certificates/${encodeURIComponent(certificateNo)}/cancel`,
     {
-      method: "DELETE",
+      method: "PATCH",
       token,
+      body: JSON.stringify({ reason }),
     }
   );
+
+  return mapCertificate(response.certificate);
 }
 
 export async function checkCertificateFileRequest(hash: string, token: string) {

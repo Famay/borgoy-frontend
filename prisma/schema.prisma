@@ -23,6 +23,13 @@ enum CertificateStatus {
   CONFIRMED
   MISMATCH
   BLOCKCHAIN_FAILED
+  CANCELLED
+}
+
+enum CertificateHistoryAction {
+  CREATED
+  STATUS_UPDATED
+  CANCELLED
 }
 
 enum AuditAction {
@@ -36,6 +43,7 @@ enum AuditAction {
   CERTIFICATE_UPLOADED
   CERTIFICATE_STATUS_UPDATED
   CERTIFICATE_DELETED
+  CERTIFICATE_CANCELLED
   CERTIFICATE_VERIFIED
   VERIFICATION_FAILED
 }
@@ -58,8 +66,10 @@ model User {
   createdAt              DateTime   @default(now())
   updatedAt              DateTime   @updatedAt
 
-  batches   Batch[]
-  auditLogs AuditLog[]
+  batches               Batch[]
+  auditLogs             AuditLog[]
+  cancelledCertificates Certificate[] @relation("CancelledCertificates")
+  certificateHistoryChanges CertificateHistory[] @relation("CertificateHistoryChangedBy")
 
   @@index([role])
   @@index([status])
@@ -88,31 +98,56 @@ model Batch {
 }
 
 model Certificate {
-  id             String            @id @default(uuid())
-  certificateNo  String            @unique
-  documentNumber String
-  authority      String
-  description    String?
-  issueDate      DateTime          @default(now())
-  status         CertificateStatus @default(PENDING)
-  fileName       String
-  fileMimeType   String
-  fileSize       Int
-  fileHash       String
-  ipfsCid        String?
-  qrPayload      String?
-  qrCodeDataUrl  String?
-  batchId        String
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  id                 String            @id @default(uuid())
+  certificateNo      String            @unique
+  documentNumber     String
+  authority          String
+  description        String?
+  issueDate          DateTime          @default(now())
+  status             CertificateStatus @default(PENDING)
+  fileName           String
+  fileMimeType       String
+  fileSize           Int
+  fileHash           String
+  ipfsCid            String?
+  qrPayload          String?
+  qrCodeDataUrl      String?
+  batchId            String
+  cancellationReason String?
+  cancelledAt        DateTime?
+  cancelledById      String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
   batch                 Batch                  @relation(fields: [batchId], references: [id], onDelete: Cascade)
   blockchainTransaction BlockchainTransaction?
   checks                VerificationResult[]
+  cancelledBy           User?                  @relation("CancelledCertificates", fields: [cancelledById], references: [id], onDelete: SetNull)
+  history               CertificateHistory[]
 
   @@index([batchId])
   @@index([fileHash])
   @@index([status])
+  @@index([cancelledById])
+}
+
+model CertificateHistory {
+  id             String                   @id @default(uuid())
+  action         CertificateHistoryAction
+  previousStatus CertificateStatus?
+  nextStatus     CertificateStatus
+  message        String
+  reason         String?
+  certificateId  String
+  changedById    String?
+  createdAt      DateTime                 @default(now())
+
+  certificate Certificate @relation(fields: [certificateId], references: [id], onDelete: Cascade)
+  changedBy    User?       @relation("CertificateHistoryChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([certificateId])
+  @@index([changedById])
+  @@index([createdAt])
 }
 
 model BlockchainTransaction {

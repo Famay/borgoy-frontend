@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../app/AuthContext";
 import { useCertificates } from "../app/CertificatesContext";
 import CertificateEvidence from "../components/certificates/CertificateEvidence";
+import CertificateHistory from "../components/certificates/CertificateHistory";
 import CertificateQr from "../components/certificates/CertificateQr";
 import type { Certificate, SupplierForm } from "../types/certificate";
 import { formatFileSize, shortenHash } from "../utils/certificates";
@@ -10,6 +11,7 @@ import { calculateSha256 } from "../utils/fileHash";
 import {
   checkCertificateFileRequest,
   createBatchRequest,
+  findReusableBatchRequest,
   uploadCertificateRequest,
 } from "../services/api";
 
@@ -28,6 +30,13 @@ function createDefaultDocumentNumber() {
 function createDefaultCertificateNo() {
   return `CERT-${new Date().getFullYear()}-${createSequenceSuffix()}`;
 }
+
+const MAX_CERTIFICATE_FILE_SIZE = 10 * 1024 * 1024;
+const allowedCertificateMimeTypes = new Set([
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+]);
 
 export default function SupplierPage() {
   const { addCertificate } = useCertificates();
@@ -55,6 +64,24 @@ export default function SupplierPage() {
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
+
+    if (file && !allowedCertificateMimeTypes.has(file.type)) {
+      event.target.value = "";
+      setSelectedFile(null);
+      setFileHash("");
+      setLastCertificate(null);
+      setError("Поддерживаются только сертификаты в формате PDF, PNG или JPEG.");
+      return;
+    }
+
+    if (file && file.size > MAX_CERTIFICATE_FILE_SIZE) {
+      event.target.value = "";
+      setSelectedFile(null);
+      setFileHash("");
+      setLastCertificate(null);
+      setError("Размер файла сертификата не должен превышать 10 МБ.");
+      return;
+    }
 
     setSelectedFile(file);
     setFileHash("");
@@ -120,17 +147,25 @@ export default function SupplierPage() {
 
       const certificateNo = createDefaultCertificateNo();
 
-      const { batch } = await createBatchRequest(
-        {
-          batchNumber: form.batchNumber,
-          productName: form.productName,
-          originRegion: form.originRegion,
-          productionDate: form.productionDate,
-          weightKg: Number(form.weightKg.replace(",", ".")) || 0,
-          description: form.description,
-        },
+      const reusableBatch = await findReusableBatchRequest(
+        form.batchNumber,
         token
       );
+      const batch =
+        reusableBatch ??
+        (
+          await createBatchRequest(
+            {
+              batchNumber: form.batchNumber,
+              productName: form.productName,
+              originRegion: form.originRegion,
+              productionDate: form.productionDate,
+              weightKg: Number(form.weightKg.replace(",", ".")) || 0,
+              description: form.description,
+            },
+            token
+          )
+        ).batch;
 
       const certificate = await uploadCertificateRequest(
         {
@@ -276,12 +311,12 @@ export default function SupplierPage() {
         <div className="upload-box upload-box--interactive">
           <div className="upload-box__title">Файл сертификата</div>
           <div className="upload-box__text">
-            Поддерживаются PDF и изображения. Система рассчитает контрольный хеш и сохранит данные для последующей проверки.
+            Поддерживаются PDF, PNG и JPEG размером до 10 МБ. Система рассчитает контрольный хеш и сохранит данные для последующей проверки.
           </div>
           <input
             className="file-input"
             type="file"
-            accept="application/pdf,image/*"
+            accept="application/pdf,image/png,image/jpeg"
             onChange={handleFileChange}
           />
 
@@ -350,6 +385,7 @@ export default function SupplierPage() {
             </div>
 
             <CertificateEvidence certificate={lastCertificate} />
+            <CertificateHistory history={lastCertificate.history} />
           </div>
         )}
 
@@ -373,7 +409,7 @@ export default function SupplierPage() {
 
       <div className="side-column">
         <div className="card">
-          <h2 className="section-title">Как проходит регистрация</h2>
+          <h2 className="section-title">Как проходит добавление сертификата</h2>
           <ol className="logic-list process-list">
             <li>
               <span>1</span>

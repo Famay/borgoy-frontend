@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../app/AuthContext";
-import { getDefaultRouteForRole } from "../utils/auth";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -45,8 +44,12 @@ export default function RegisterPage() {
       return;
     }
 
-    navigate(getDefaultRouteForRole(result.user?.role ?? "supplier"), {
+    navigate("/login", {
       replace: true,
+      state: {
+        message:
+          "Регистрация завершена. Войдите в систему и подтвердите email-код.",
+      },
     });
   };
 

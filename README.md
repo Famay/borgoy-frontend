@@ -10,17 +10,23 @@ VerMeat - дипломный проект для цифровой верифик
 - двухфакторный вход поставщика через email-код;
 - создание партий продукции;
 - загрузка сертификатов;
+- проверка формата PDF, PNG или JPEG и лимита 10 МБ при загрузке;
 - расчет SHA-256 хеша сертификата;
 - загрузка файла сертификата в Pinata/IPFS;
 - фиксация хеша сертификата в смарт-контракте Polygon Amoy;
 - генерация QR-кода публичной проверки;
 - публичная проверка без регистрации;
+- rate limiting для входа, подтверждения 2FA и публичной проверки;
 - личная страница поставщика с его сертификатами;
+- список партий с поиском и пагинацией;
+- детальная страница партии с QR-кодом, сертификатами и историей проверок;
 - административный dashboard;
 - реестр сертификатов с фильтрами;
-- управление поставщиками;
-- журнал аудита;
+- аннулирование сертификатов с сохранением причины и истории;
+- управление поставщиками с поиском, фильтром статуса и пагинацией;
+- журнал аудита с фильтрами и пагинацией;
 - страница состояния системы;
+- явный режим интеграций `INTEGRATION_MODE=demo|live` с запретом demo в production;
 - Docker/Nginx/PostgreSQL контур для деплоя.
 
 ## Стек
@@ -103,10 +109,23 @@ npm.cmd run server:typecheck
 npm.cmd run prisma:generate
 npm.cmd run prisma:migrate
 npm.cmd run prisma:deploy
+npm.cmd run test:api
 npm.cmd run hardhat:compile
 npm.cmd run hardhat:test
 npm.cmd run hardhat:deploy:amoy
 ```
+
+## Интеграционные тесты API
+
+Минимальный backend-сценарий запускается командой:
+
+```powershell
+npm.cmd run test:api
+```
+
+Runner использует `TEST_DATABASE_URL` или создает имя тестовой базы из
+`DATABASE_URL`, добавляя суффикс `_test`. Перед запуском тестов применяются
+Prisma-миграции. Очистка данных разрешена только для базы с суффиксом `_test`.
 
 ## Переменные окружения
 
@@ -114,10 +133,11 @@ npm.cmd run hardhat:deploy:amoy
 
 Основные группы переменных:
 
-- PostgreSQL: `POSTGRES_*`, `DATABASE_URL`;
-- авторизация: `JWT_SECRET`, `JWT_EXPIRES_IN`;
+- PostgreSQL: `POSTGRES_*`, `DATABASE_URL`, `TEST_DATABASE_URL`;
+- авторизация: `JWT_SECRET`, `JWT_EXPIRES_IN`, `RATE_LIMIT_*`;
 - frontend/API: `CLIENT_ORIGIN`, `PUBLIC_APP_URL`, `VITE_API_URL`;
 - email 2FA: `TWO_FACTOR_EMAIL_PROVIDER`, `EMAIL_FROM`, `SMTP_*`, `RESEND_API_KEY`;
+- режим интеграций: `INTEGRATION_MODE=demo|live`;
 - IPFS: `PINATA_JWT`, `PINATA_GATEWAY`;
 - Polygon Amoy: `POLYGON_AMOY_RPC_URL`, `POLYGON_PRIVATE_KEY`, `CERTIFICATE_CONTRACT_ADDRESS`;
 - TLS/deploy: `SERVER_NAME`, `CERTBOT_DOMAIN`, `LETSENCRYPT_EMAIL`, `NGINX_TEMPLATE`.

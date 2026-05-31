@@ -42,6 +42,7 @@ POSTGRES_PASSWORD=<strong-password>
 
 JWT_SECRET=<long-random-secret>
 JWT_EXPIRES_IN=7d
+INTEGRATION_MODE=live
 
 PUBLIC_APP_URL=https://vermeat.ru
 CLIENT_ORIGIN=https://vermeat.ru
@@ -334,20 +335,25 @@ server/email-outbox/2fa-codes.txt
 
 ### IPFS работает в demo-режиме
 
-Причина: не заполнен `PINATA_JWT`.
+Причина: задано `INTEGRATION_MODE=demo`. Такой режим предназначен для локальной
+разработки и тестов. При `NODE_ENV=production` API откажется запускаться.
 
-Заполнить:
+Включить live-режим и заполнить:
 
 ```env
+INTEGRATION_MODE=live
 PINATA_JWT=<pinata-jwt>
 PINATA_GATEWAY=<gateway>
 ```
 
 ### Blockchain работает в demo-режиме
 
-Причина: не заполнены переменные:
+Причина: задано `INTEGRATION_MODE=demo`.
+
+Для production включить live-режим и заполнить:
 
 ```env
+INTEGRATION_MODE=live
 POLYGON_AMOY_RPC_URL
 POLYGON_PRIVATE_KEY
 CERTIFICATE_CONTRACT_ADDRESS

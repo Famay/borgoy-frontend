@@ -22,7 +22,7 @@ interface IpfsUploadResult {
 let pinataClient: PinataSDK | null = null;
 
 function isPinataConfigured() {
-  return Boolean(env.PINATA_JWT?.trim());
+  return env.INTEGRATION_MODE === "live";
 }
 
 function getPinataClient() {

@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import { Router } from "express";
 import { z } from "zod";
 import { AuditAction, UserRole, UserStatus } from "../../../generated/prisma/enums";
+import { env } from "../../config/env";
 import { prisma } from "../../db/prisma";
 import {
   requireAuth,
@@ -9,6 +10,7 @@ import {
   signTwoFactorChallengeToken,
   verifyTwoFactorChallengeToken,
 } from "../../middleware/auth";
+import { createRateLimiter } from "../../middleware/rateLimit";
 import { maskEmail, sendTwoFactorEmail } from "../../services/email.service";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { HttpError } from "../../utils/httpError";
@@ -16,6 +18,16 @@ import { generateOtpCode, hashOtpCode, verifyOtpCode } from "../../utils/otp";
 
 const TWO_FACTOR_CODE_TTL_MS = 5 * 60 * 1000;
 const TWO_FACTOR_MAX_ATTEMPTS = 5;
+const loginRateLimiter = createRateLimiter({
+  windowMs: env.RATE_LIMIT_LOGIN_WINDOW_MS,
+  maxRequests: env.RATE_LIMIT_LOGIN_MAX,
+  message: "Слишком много попыток входа. Повторите попытку позже.",
+});
+const twoFactorRateLimiter = createRateLimiter({
+  windowMs: env.RATE_LIMIT_TWO_FACTOR_WINDOW_MS,
+  maxRequests: env.RATE_LIMIT_TWO_FACTOR_MAX,
+  message: "Слишком много попыток подтверждения 2FA. Повторите попытку позже.",
+});
 
 const registerSchema = z.object({
   name: z.string().min(2),
@@ -210,18 +222,13 @@ authRouter.post(
       },
     });
 
-    const token = signAccessToken({
-      sub: user.id,
-      role: user.role,
-      email: user.email,
-    });
-
-    res.status(201).json({ user: mapAuthUser(user), token });
+    res.status(201).json({ user: mapAuthUser(user) });
   })
 );
 
 authRouter.post(
   "/login",
+  loginRateLimiter,
   asyncHandler(async (req, res) => {
     const payload = loginSchema.parse(req.body);
     const email = payload.email.trim().toLowerCase();
@@ -271,6 +278,7 @@ authRouter.post(
 
 authRouter.post(
   "/login/2fa",
+  twoFactorRateLimiter,
   asyncHandler(async (req, res) => {
     const payload = twoFactorLoginSchema.parse(req.body);
     const challenge = verifyTwoFactorChallengeToken(payload.challengeToken);

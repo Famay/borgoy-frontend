@@ -2,21 +2,26 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../app/AuthContext";
 import { useCertificates } from "../app/CertificatesContext";
 import CertificateEvidence from "../components/certificates/CertificateEvidence";
+import CertificateHistory from "../components/certificates/CertificateHistory";
 import CertificateQr from "../components/certificates/CertificateQr";
 import StatusBadge from "../components/ui/StatusBadge";
 import {
-  deleteCertificateRequest,
+  cancelCertificateRequest,
   getCertificatesRequest,
   updateCertificateStatusRequest,
 } from "../services/api";
 import type { Certificate, CertificateStatus } from "../types/certificate";
 import { shortenHash } from "../utils/certificates";
 
-const statusOptions: CertificateStatus[] = [
+const mutableStatusOptions: CertificateStatus[] = [
   "На проверке",
   "Подтвержден",
   "Есть расхождения",
   "Ошибка blockchain",
+];
+const statusOptions: CertificateStatus[] = [
+  ...mutableStatusOptions,
+  "Аннулирован",
 ];
 
 const allStatuses = "all";
@@ -151,16 +156,16 @@ export default function RegistryPage() {
     }
   };
 
-  const handleDelete = async (certificate: Certificate) => {
+  const handleCancel = async (certificate: Certificate) => {
     if (!token) {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Удалить сертификат ${certificate.id}? Это действие нельзя отменить.`
+    const reason = window.prompt(
+      `Укажите причину аннулирования сертификата ${certificate.id}. Это действие нельзя отменить.`
     );
 
-    if (!confirmed) {
+    if (reason === null) {
       return;
     }
 
@@ -169,16 +174,22 @@ export default function RegistryPage() {
     setMessage("");
 
     try {
-      await deleteCertificateRequest(certificate.id, token);
-      setApiCertificates((current) =>
-        current.filter((item) => item.id !== certificate.id)
+      const cancelledCertificate = await cancelCertificateRequest(
+        certificate.id,
+        reason,
+        token
       );
-      setMessage(`Сертификат ${certificate.id} удален.`);
-    } catch (deleteError) {
+      setApiCertificates((current) =>
+        current.map((item) =>
+          item.id === certificate.id ? cancelledCertificate : item
+        )
+      );
+      setMessage(`Сертификат ${certificate.id} аннулирован.`);
+    } catch (cancelError) {
       setError(
-        deleteError instanceof Error
-          ? deleteError.message
-          : "Не удалось удалить сертификат"
+        cancelError instanceof Error
+          ? cancelError.message
+          : "Не удалось аннулировать сертификат"
       );
     } finally {
       setProcessingId("");
@@ -191,8 +202,8 @@ export default function RegistryPage() {
         <div>
           <h1 className="section-title">Реестр сертификатов</h1>
           <p className="section-subtitle">
-            Администратор может менять статус сертификата и удалять ошибочные
-            записи из реестра.
+            Администратор может менять статус сертификата и аннулировать
+            ошибочные записи без удаления истории.
           </p>
         </div>
         <button
@@ -285,22 +296,37 @@ export default function RegistryPage() {
                         event.target.value as CertificateStatus
                       )
                     }
-                    disabled={processingId === certificate.id || !token}
+                    disabled={
+                      processingId === certificate.id ||
+                      !token ||
+                      certificate.status === "Аннулирован"
+                    }
                   >
-                    {statusOptions.map((status) => (
+                    {mutableStatusOptions.map((status) => (
                       <option key={status} value={status}>
                         {status}
                       </option>
                     ))}
+                    {certificate.status === "Аннулирован" && (
+                      <option value="Аннулирован">Аннулирован</option>
+                    )}
                   </select>
                 </label>
 
                 <button
                   className="button button--danger"
-                  onClick={() => void handleDelete(certificate)}
-                  disabled={processingId === certificate.id || !token}
+                  onClick={() => void handleCancel(certificate)}
+                  disabled={
+                    processingId === certificate.id ||
+                    !token ||
+                    certificate.status === "Аннулирован"
+                  }
                 >
-                  {processingId === certificate.id ? "Обработка..." : "Удалить"}
+                  {processingId === certificate.id
+                    ? "Обработка..."
+                    : certificate.status === "Аннулирован"
+                      ? "Аннулирован"
+                      : "Аннулировать"}
                 </button>
               </div>
 
@@ -337,9 +363,22 @@ export default function RegistryPage() {
                   <span>Транзакция</span>
                   <strong>{shortenHash(certificate.blockchain, 14, 8)}</strong>
                 </div>
+                {certificate.cancellationReason && (
+                  <div>
+                    <span>Причина аннулирования</span>
+                    <strong>{certificate.cancellationReason}</strong>
+                  </div>
+                )}
+                {certificate.cancelledAt && (
+                  <div>
+                    <span>Дата аннулирования</span>
+                    <strong>{certificate.cancelledAt.slice(0, 10)}</strong>
+                  </div>
+                )}
               </div>
 
               <CertificateEvidence certificate={certificate} />
+              <CertificateHistory history={certificate.history} />
 
               {certificate.publicUrl && (
                 <div className="registry-card__footer">
