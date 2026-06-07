@@ -40,14 +40,23 @@ function getPinataClient() {
   return pinataClient;
 }
 
-function createGatewayUrl(cid: string) {
+export function createGatewayUrl(cid?: string | null) {
+  if (!cid) {
+    return undefined;
+  }
+
   const gateway = env.PINATA_GATEWAY?.trim();
 
   if (!gateway) {
-    return `ipfs://${cid}`;
+    return `https://ipfs.io/ipfs/${encodeURIComponent(cid)}`;
   }
 
-  return `https://${gateway.replace(/^https?:\/\//, "")}/ipfs/${cid}`;
+  const normalizedGateway = gateway
+    .replace(/^https?:\/\//, "")
+    .replace(/\/+$/, "")
+    .replace(/\/ipfs$/, "");
+
+  return `https://${normalizedGateway}/ipfs/${encodeURIComponent(cid)}`;
 }
 
 export async function uploadCertificateToIpfs(
@@ -61,7 +70,7 @@ export async function uploadCertificateToIpfs(
     return {
       cid,
       provider: "demo",
-      gatewayUrl: `ipfs://${cid}`,
+      gatewayUrl: createGatewayUrl(cid),
     };
   }
 

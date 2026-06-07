@@ -10,7 +10,10 @@ import {
 import { prisma } from "../../db/prisma";
 import { requireAuth, requireRole } from "../../middleware/auth";
 import { registerCertificateOnChain } from "../../services/blockchain.service";
-import { uploadCertificateToIpfs } from "../../services/ipfs.service";
+import {
+  createGatewayUrl,
+  uploadCertificateToIpfs,
+} from "../../services/ipfs.service";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { sha256 } from "../../utils/hash";
 import { HttpError } from "../../utils/httpError";
@@ -56,6 +59,15 @@ const fileHashQuerySchema = z.object({
 });
 
 export const certificatesRouter = Router();
+
+function withIpfsGatewayUrl<T extends { ipfsCid?: string | null }>(
+  certificate: T
+) {
+  return {
+    ...certificate,
+    ipfsGatewayUrl: createGatewayUrl(certificate.ipfsCid),
+  };
+}
 
 certificatesRouter.get(
   "/certificates",
@@ -103,7 +115,7 @@ certificatesRouter.get(
       orderBy: { createdAt: "desc" },
     });
 
-    res.json({ certificates });
+    res.json({ certificates: certificates.map(withIpfsGatewayUrl) });
   })
 );
 
@@ -186,7 +198,13 @@ certificatesRouter.get(
       throw new HttpError(403, "Недостаточно прав");
     }
 
-    res.json({ certificate: { ...certificate, batch, blockchainTransaction } });
+    res.json({
+      certificate: withIpfsGatewayUrl({
+        ...certificate,
+        batch,
+        blockchainTransaction,
+      }),
+    });
   })
 );
 
@@ -338,6 +356,6 @@ certificatesRouter.post(
       },
     });
 
-    res.status(201).json({ certificate });
+    res.status(201).json({ certificate: withIpfsGatewayUrl(certificate) });
   })
 );

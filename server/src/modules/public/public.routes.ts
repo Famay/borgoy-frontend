@@ -6,6 +6,7 @@ import { env } from "../../config/env";
 import { prisma } from "../../db/prisma";
 import { createRateLimiter } from "../../middleware/rateLimit";
 import { verifyCertificateOnChain } from "../../services/blockchain.service";
+import { createGatewayUrl } from "../../services/ipfs.service";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { getRouteParam } from "../../utils/request";
 
@@ -285,6 +286,7 @@ async function verifyCertificate(input: VerifyCertificateInput) {
         fileSize: certificate.fileSize,
         fileHash: certificate.fileHash,
         ipfsCid: certificate.ipfsCid,
+        ipfsGatewayUrl: createGatewayUrl(certificate.ipfsCid),
         qrPayload: certificate.qrPayload,
         qrCodeDataUrl: certificate.qrCodeDataUrl,
         cancellationReason: certificate.cancellationReason,

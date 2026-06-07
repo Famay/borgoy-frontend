@@ -4,6 +4,7 @@ import { AuditAction, UserRole } from "../../../generated/prisma/enums";
 import { Prisma } from "../../../generated/prisma/client";
 import { prisma } from "../../db/prisma";
 import { requireAuth, requireRole } from "../../middleware/auth";
+import { createGatewayUrl } from "../../services/ipfs.service";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { createPublicToken } from "../../utils/hash";
 import { HttpError } from "../../utils/httpError";
@@ -29,6 +30,18 @@ const batchListQuerySchema = z.object({
 });
 
 export const batchesRouter = Router();
+
+function addCertificateGatewayUrls<
+  T extends { certificates?: Array<{ ipfsCid?: string | null }> },
+>(batch: T) {
+  return {
+    ...batch,
+    certificates: batch.certificates?.map((certificate) => ({
+      ...certificate,
+      ipfsGatewayUrl: createGatewayUrl(certificate.ipfsCid),
+    })),
+  };
+}
 
 batchesRouter.get(
   "/",
@@ -218,7 +231,7 @@ batchesRouter.get(
     ]);
 
     res.json({
-      batch,
+      batch: addCertificateGatewayUrls(batch),
       verificationSummary: {
         total: batch._count.checks,
         failed: failedVerificationChecks,
